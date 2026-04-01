@@ -402,6 +402,85 @@ blockquote {
   gap: 1rem;
 }
 
+.chat-shell {
+  margin-top: 0.2rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.chat-log {
+  max-height: 24rem;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.85rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(147, 173, 217, 0.22);
+  background: rgba(4, 7, 13, 0.6);
+}
+
+.chat-message {
+  max-width: min(48rem, 94%);
+  padding: 0.68rem 0.82rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(147, 173, 217, 0.2);
+  background: rgba(11, 17, 29, 0.85);
+}
+
+.chat-message p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.chat-message.user {
+  justify-self: end;
+  background: rgba(31, 64, 113, 0.72);
+  border-color: rgba(149, 188, 247, 0.42);
+}
+
+.chat-message.assistant {
+  justify-self: start;
+}
+
+.chat-sources {
+  margin-top: 0.5rem !important;
+  color: rgba(178, 201, 235, 0.9) !important;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chat-form {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.chat-form textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 4.4rem;
+  border-radius: 0.72rem;
+  border: 1px solid rgba(148, 176, 221, 0.42);
+  background: rgba(3, 6, 12, 0.76);
+  color: #edf4ff;
+  padding: 0.72rem 0.8rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.chat-form textarea:focus {
+  outline: 2px solid rgba(150, 191, 255, 0.38);
+  outline-offset: 1px;
+}
+
+.chat-error {
+  margin: 0;
+  color: #ffb8bf;
+  font-size: 0.9rem;
+}
+
 .twin-actions {
   margin-top: 0.4rem;
   display: flex;
@@ -420,6 +499,11 @@ blockquote {
   letter-spacing: 0.06em;
   font-size: 0.75rem;
   font-weight: 700;
+}
+
+.twin-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .twin-actions span {
