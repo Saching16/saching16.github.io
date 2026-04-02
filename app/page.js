@@ -304,7 +304,7 @@ export default function HomePage() {
         <section id="projects" className="section">
           <div className="container">
             <p className="eyebrow">03</p>
-            <h2>Selected projects</h2>
+            <h2>Featured projects</h2>
             <div className="project-grid">
               {projects.map((project) => (
                 <article className="project-card" key={project.title}>
