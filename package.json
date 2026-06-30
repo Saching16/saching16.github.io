@@ -4,13 +4,25 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "npm run sync-rag",
+    "sync-rag": "node scripts/sync-rag-sources.mjs",
+    "refresh-linkedin": "node scripts/refresh-linkedin.mjs",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "eslint .",
+    "test": "vitest run"
   },
   "dependencies": {
-    "next": "latest",
+    "next": "^16.2.2",
     "openai": "^6.33.0",
-    "react": "latest",
-    "react-dom": "latest"
+    "pdf-parse": "^2.4.5",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.2",
+    "prettier": "^3.8.1",
+    "vitest": "^4.1.2"
   }
 }

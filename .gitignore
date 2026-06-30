@@ -4,3 +4,4 @@ node_modules
 out
 npm-debug.log*
 .vercel
+coverage

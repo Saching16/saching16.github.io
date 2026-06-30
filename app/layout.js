@@ -13,15 +13,20 @@ const newsreader = Newsreader({
 });
 
 export const metadata = {
-  title: "Sachin Ganpule | Research Archive",
+  title: "Sachin Ganpule | AI Engineering + Agent Research",
   description:
-    "Master of Applied Data Science at University of Michigan. Multi-agent systems, LLM optimization, and MLOps.",
+    "Master of Applied Data Science candidate researching agents, latent space reasoning, RAG, and production AI systems.",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${newsreader.variable}`}>{children}</body>
+      <body className={`${inter.variable} ${newsreader.variable}`}>
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,95 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import profilePhoto from "../assets/profile.png";
-
-const readingArchive = [
-  {
-    date: "2023 / ICLR",
-    title: "ReAct: Synergizing Reasoning and Acting in Language Models",
-    description:
-      "A framework for language models to generate reasoning traces and task-specific actions in an interleaved manner.",
-    status: "Verified",
-  },
-  {
-    date: "2023 / NeurIPS",
-    title: "Reflexion: Language Agents with Iterative Self-Reflection",
-    description:
-      "An architecture that endows agentic workflows with dynamic memory and self-reflection to improve decision-making.",
-    status: "In practice",
-  },
-  {
-    date: "2017 / NIPS",
-    title: "Attention is All You Need",
-    description:
-      "The foundational architecture for modern LLMs. Maintaining a solid understanding of the core attention mechanism mechanics.",
-    status: "Verified",
-  },
-];
-
-const projects = [
-  {
-    title: "Multi-Agent Researcher System",
-    description:
-      "Designing a pipeline with CrewAI + LangGraph featuring planner, researcher, writer, and validator agents with persistent memory.",
-    tags: ["CrewAI", "LangGraph"],
-  },
-  {
-    title: "High-Performance Code Optimizer",
-    description:
-      "LLM-driven tool translating Python to optimized C++, achieving a performance increase of 60,000x with a self-correction loop.",
-    tags: ["C++", "LLM fine-tuning"],
-  },
-  {
-    title: "Autonomous Trading Floor",
-    description:
-      "Multi-agent system with four autonomous agents powered by six MCP servers and specialized tools on AWS architecture.",
-    tags: ["AWS", "LangFuse"],
-  },
-  {
-    title: "GrAldient",
-    description:
-      "AI-powered grading tool leveraging YOLOv8 and Tesseract 5 for OCR to automate test evaluations from scanned PDFs.",
-    tags: ["YOLOv8", "OCR"],
-  },
-];
-
-const INITIAL_TWIN_MESSAGE = {
-  role: "assistant",
-  content:
-    "I am your Digital Twin. Ask about education, projects, technical strengths, or career direction.",
-  sources: [],
-};
+import { useMemo } from "react";
+import { DigitalTwinChat } from "../components/DigitalTwinChat";
+import { HeroSection } from "../components/HeroSection";
+import { SiteHeader } from "../components/SiteHeader";
+import { PROJECTS } from "../data/projects";
+import { READING_ARCHIVE } from "../data/readingArchive";
+import { useScrollProgress } from "../hooks/useScrollProgress";
 
 export default function HomePage() {
-  const [scrollProgress, setScrollProgress] = useState(0);
-  const [messages, setMessages] = useState([INITIAL_TWIN_MESSAGE]);
-  const [questionInput, setQuestionInput] = useState("");
-  const [isAsking, setIsAsking] = useState(false);
-  const [chatError, setChatError] = useState("");
-
-  useEffect(() => {
-    const updateScrollProgress = () => {
-      const pageHeight =
-        document.documentElement.scrollHeight - window.innerHeight;
-      if (pageHeight <= 0) {
-        setScrollProgress(0);
-        return;
-      }
-
-      const progress = Math.min(1, Math.max(0, window.scrollY / pageHeight));
-      setScrollProgress(progress);
-    };
-
-    updateScrollProgress();
-    window.addEventListener("scroll", updateScrollProgress, { passive: true });
-    window.addEventListener("resize", updateScrollProgress);
-
-    return () => {
-      window.removeEventListener("scroll", updateScrollProgress);
-      window.removeEventListener("resize", updateScrollProgress);
-    };
-  }, []);
+  const scrollProgress = useScrollProgress();
 
   const backgroundStyle = useMemo(() => {
     const depth = 1 - scrollProgress;
@@ -117,132 +37,20 @@ export default function HomePage() {
     };
   }, [scrollProgress]);
 
-  async function handleTwinSubmit(event) {
-    event.preventDefault();
-    if (isAsking) {
-      return;
-    }
-
-    const question = questionInput.trim();
-    if (!question) {
-      return;
-    }
-
-    setChatError("");
-    setQuestionInput("");
-
-    const userMessage = {
-      role: "user",
-      content: question,
-      sources: [],
-    };
-    const nextMessages = [...messages, userMessage];
-    setMessages(nextMessages);
-    setIsAsking(true);
-
-    try {
-      const history = messages
-        .slice(1)
-        .map((entry) => ({
-          role: entry.role,
-          content: entry.content,
-        }));
-
-      const response = await fetch("/api/digital-twin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: question,
-          history,
-        }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.error || "Could not answer that question.");
-      }
-
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          role: "assistant",
-          content: payload.answer,
-          sources: payload.sources || [],
-        },
-      ]);
-    } catch (error) {
-      setChatError(
-        error?.message ||
-          "Digital Twin is unavailable right now. Please try again in a moment.",
-      );
-    } finally {
-      setIsAsking(false);
-    }
-  }
-
   return (
     <div className="site-shell" style={backgroundStyle}>
-      <header className="site-header">
-        <div className="container nav-row">
-          <a href="#" className="brand">
-            Sachin Ganpule
-          </a>
-          <nav className="nav-links">
-            <a href="#inquiry">Areas of inquiry</a>
-            <a href="#reading">Reading archive</a>
-            <a href="#projects">Projects</a>
-            <a href="mailto:sachin.s.ganpule@gmail.com">Contact</a>
-          </nav>
-        </div>
-      </header>
+      <SiteHeader />
 
-      <main>
-        <section className="hero section">
-          <div className="container hero-grid">
-            <div className="hero-left">
-              <div className="portrait-frame">
-                <img
-                  src={profilePhoto.src}
-                  alt="Portrait of Sachin Ganpule wearing a tan sweater and white collared shirt with autumn trees in the background."
-                  className="portrait"
-                  width="384"
-                  height="384"
-                />
-              </div>
-              <div>
-                <p className="eyebrow">Research archive</p>
-                <h1>Sachin Ganpule</h1>
-              </div>
-            </div>
-
-            <div className="hero-right">
-              <p className="lead">
-                I am a Master of Applied Data Science candidate at the
-                University of Michigan, Ann Arbor, and hold a BS in Electrical
-                and Computer Engineering from Rutgers University.
-              </p>
-              <p>
-                My journey involves bridging the gap between high-performance
-                systems engineering and cutting-edge deep learning research. I
-                specialize in developing scalable AI architectures and
-                multi-agent systems.
-              </p>
-              <blockquote>
-                The transition from optimizing high-performance engineering
-                systems to questioning the fundamental mechanics of AI agents
-                represents my current intellectual trajectory.
-              </blockquote>
-              <a href="mailto:sachin.s.ganpule@gmail.com" className="cta">
-                Get in touch
-              </a>
-            </div>
-          </div>
-        </section>
+      <main id="main-content">
+        <HeroSection />
 
         <section className="status-bar">
           <div className="container status-content">
             <p className="eyebrow">Status</p>
-            <p>Developing multi-agent research pipelines at scale.</p>
+            <p>
+              Building applied RAG and forecasting systems while researching
+              latent delegation in recursive agent harnesses.
+            </p>
           </div>
         </section>
 
@@ -255,27 +63,30 @@ export default function HomePage() {
                 <h3>Core skills and focus</h3>
                 <div className="chip-grid">
                   <span>PyTorch</span>
-                  <span>HuggingFace Transformers</span>
+                  <span>HuggingFace</span>
                   <span>RAG</span>
-                  <span>Vector DBs (FAISS)</span>
+                  <span>Azure AI Search</span>
+                  <span>pgvector / HNSW</span>
                   <span>QLoRA</span>
-                  <span>CrewAI</span>
+                  <span>OpenAI Agents SDK</span>
                   <span>LangGraph</span>
+                  <span>LangFuse</span>
                   <span>Kubernetes</span>
                 </div>
                 <p>
-                  Focusing on the convergence of multi-agent systems, LLM
-                  optimization (quantization and fine-tuning), and robust MLOps
-                  infrastructure.
+                  Focusing on production-grade AI systems: hybrid retrieval,
+                  semantic caching, multi-agent orchestration, observability,
+                  and infrastructure that can support research experiments.
                 </p>
               </article>
               <article className="panel">
                 <h3>Interests</h3>
                 <ul className="interest-list">
-                  <li>Agentic workflows</li>
-                  <li>Alignment and AI safety</li>
-                  <li>AI inspired by biology</li>
-                  <li>Inference engineering</li>
+                  <li>Latent space reasoning</li>
+                  <li>LatentMAS</li>
+                  <li>RecursiveMAS</li>
+                  <li>Agent observability</li>
+                  <li>Retrieval and memory systems</li>
                 </ul>
               </article>
             </div>
@@ -287,7 +98,7 @@ export default function HomePage() {
             <p className="eyebrow">02</p>
             <h2>Reading archive</h2>
             <div className="stack">
-              {readingArchive.map((item) => (
+              {READING_ARCHIVE.map((item) => (
                 <article className="reading-item" key={item.title}>
                   <p className="reading-date">{item.date}</p>
                   <div>
@@ -306,7 +117,7 @@ export default function HomePage() {
             <p className="eyebrow">03</p>
             <h2>Featured projects</h2>
             <div className="project-grid">
-              {projects.map((project) => (
+              {PROJECTS.map((project) => (
                 <article className="project-card" key={project.title}>
                   <h3>{project.title}</h3>
                   <p>{project.description}</p>
@@ -320,64 +131,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-
-        <section className="section section-soft">
-          <div className="container">
-            <article className="twin-panel">
-              <p className="eyebrow">Experimental</p>
-              <h2>Project: Digital Twin</h2>
-              <p>
-                Ask questions about my career. The assistant uses retrieval
-                from resume and LinkedIn documents before generating answers.
-              </p>
-
-              <div className="chat-shell">
-                <div className="chat-log" aria-live="polite">
-                  {messages.map((message, index) => (
-                    <article
-                      className={`chat-message ${message.role}`}
-                      key={`${message.role}-${index}`}
-                    >
-                      <p>{message.content}</p>
-                      {message.sources?.length > 0 && (
-                        <p className="chat-sources">
-                          Sources: {message.sources.join(", ")}
-                        </p>
-                      )}
-                    </article>
-                  ))}
-                  {isAsking && (
-                    <article className="chat-message assistant">
-                      <p>Thinking...</p>
-                    </article>
-                  )}
-                </div>
-
-                <form className="chat-form" onSubmit={handleTwinSubmit}>
-                  <textarea
-                    value={questionInput}
-                    onChange={(event) => setQuestionInput(event.target.value)}
-                    placeholder="Ask about experience, projects, or career goals..."
-                    rows={3}
-                    disabled={isAsking}
-                  />
-                  <div className="twin-actions">
-                    <button type="submit" disabled={isAsking}>
-                      {isAsking ? "Answering..." : "Ask Digital Twin"}
-                    </button>
-                    <span>RAG over resume + LinkedIn</span>
-                  </div>
-                </form>
-
-                {chatError && (
-                  <p className="chat-error" role="alert">
-                    {chatError}
-                  </p>
-                )}
-              </div>
-            </article>
-          </div>
-        </section>
+        <DigitalTwinChat />
       </main>
 
       <footer className="site-footer">
