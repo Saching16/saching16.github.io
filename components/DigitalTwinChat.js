@@ -86,7 +86,7 @@ export function DigitalTwinChat() {
   }
 
   return (
-    <section className="section section-soft">
+    <section id="digital-twin" className="section section-soft">
       <div className="container">
         <article className="twin-panel">
           <p className="eyebrow">Experimental</p>

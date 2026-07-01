@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { href: "#inquiry", label: "Areas of inquiry" },
   { href: "#reading", label: "Reading archive" },
   { href: "#projects", label: "Projects" },
+  { href: "#digital-twin", label: "RAG chatbot" },
   { href: "/resume.pdf", label: "Resume" },
   { href: "mailto:sachin.s.ganpule@gmail.com", label: "Contact" },
 ];

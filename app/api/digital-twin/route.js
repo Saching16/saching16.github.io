@@ -4,6 +4,7 @@ import {
   RATE_LIMIT_MAX_REQUESTS,
   RATE_LIMIT_WINDOW_MS,
 } from "../../../lib/digitalTwinConfig";
+import { logDigitalTwinEvent } from "../../../lib/digitalTwinAnalytics";
 import { answerCareerQuestion } from "../../../lib/digitalTwinRag";
 import { checkRateLimit, getRateLimitKey } from "../../../lib/rateLimiter";
 
@@ -37,8 +38,18 @@ function isAllowedOrigin(request) {
 }
 
 export async function POST(request) {
+  const startedAt = Date.now();
+  let messageLength = 0;
+  let historyLength = 0;
+
   try {
     if (!isAllowedOrigin(request)) {
+      logDigitalTwinEvent({
+        request,
+        outcome: "blocked_origin",
+        status: 403,
+        startedAt,
+      });
       return NextResponse.json(
         { error: "Origin is not allowed." },
         { status: 403 },
@@ -51,6 +62,12 @@ export async function POST(request) {
       maxRequests: RATE_LIMIT_MAX_REQUESTS,
     });
     if (!rateLimit.allowed) {
+      logDigitalTwinEvent({
+        request,
+        outcome: "rate_limited",
+        status: 429,
+        startedAt,
+      });
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again shortly." },
         {
@@ -66,8 +83,19 @@ export async function POST(request) {
     const message =
       typeof payload?.message === "string" ? payload.message.trim() : "";
     const history = Array.isArray(payload?.history) ? payload.history : [];
+    messageLength = message.length;
+    historyLength = history.length;
 
     if (!message) {
+      logDigitalTwinEvent({
+        request,
+        outcome: "validation_error",
+        status: 400,
+        startedAt,
+        messageLength,
+        historyLength,
+        error: "A message is required.",
+      });
       return NextResponse.json(
         { error: "A message is required." },
         { status: 400 },
@@ -75,6 +103,15 @@ export async function POST(request) {
     }
 
     if (message.length > MAX_MESSAGE_CHARS) {
+      logDigitalTwinEvent({
+        request,
+        outcome: "validation_error",
+        status: 400,
+        startedAt,
+        messageLength,
+        historyLength,
+        error: `Message must be ${MAX_MESSAGE_CHARS} characters or fewer.`,
+      });
       return NextResponse.json(
         {
           error: `Message must be ${MAX_MESSAGE_CHARS} characters or fewer.`,
@@ -88,8 +125,27 @@ export async function POST(request) {
       history,
     });
 
+    logDigitalTwinEvent({
+      request,
+      outcome: "success",
+      status: 200,
+      startedAt,
+      messageLength,
+      historyLength,
+      sources: result.sources || [],
+    });
+
     return NextResponse.json(result);
   } catch (error) {
+    logDigitalTwinEvent({
+      request,
+      outcome: "error",
+      status: 500,
+      startedAt,
+      messageLength,
+      historyLength,
+      error: error?.message || "Digital Twin route error.",
+    });
     return NextResponse.json(
       {
         error:

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MAX_MESSAGE_CHARS } from "../lib/digitalTwinConfig";
+import {
+  MAX_MESSAGE_CHARS,
+  RATE_LIMIT_MAX_REQUESTS,
+} from "../lib/digitalTwinConfig";
+import { resetRateLimitBuckets } from "../lib/rateLimiter";
 
 vi.mock("../lib/digitalTwinRag", () => ({
   answerCareerQuestion: vi.fn(),
@@ -11,6 +15,7 @@ import { answerCareerQuestion } from "../lib/digitalTwinRag";
 describe("POST /api/digital-twin", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetRateLimitBuckets();
   });
 
   it("returns 400 when message is missing", async () => {
@@ -90,5 +95,34 @@ describe("POST /api/digital-twin", () => {
       answer: "Sample answer",
       sources: ["Resume"],
     });
+  });
+
+  it("limits clients to five questions per minute", async () => {
+    answerCareerQuestion.mockResolvedValue({
+      answer: "Sample answer",
+      sources: ["Resume"],
+    });
+
+    let response;
+    for (let index = 0; index < RATE_LIMIT_MAX_REQUESTS + 1; index += 1) {
+      const request = new Request("http://localhost:3000/api/digital-twin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          host: "localhost:3000",
+          "x-forwarded-for": "203.0.113.10",
+        },
+        body: JSON.stringify({
+          message: `Question ${index}`,
+          history: [],
+        }),
+      });
+
+      response = await POST(request);
+    }
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBeTruthy();
+    expect(answerCareerQuestion).toHaveBeenCalledTimes(RATE_LIMIT_MAX_REQUESTS);
   });
 });
