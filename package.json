@@ -6,7 +6,7 @@
     "dev": "next dev",
     "prebuild": "npm run sync-rag",
     "sync-rag": "node scripts/sync-rag-sources.mjs",
-    "refresh-linkedin": "node scripts/refresh-linkedin.mjs",
+    "fetch-drive": "node --env-file-if-exists=.env scripts/fetch-drive-sources.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

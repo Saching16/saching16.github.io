@@ -4,19 +4,35 @@ This folder contains the source material used by the Digital Twin chatbot.
 
 ## Files
 
-- `resume.pdf`: replace this whenever there is a new resume.
-- `linkedin.txt`: stable LinkedIn source text. The monthly GitHub Action attempts to refresh this from the public profile.
-- `linkedin.pdf`: fallback LinkedIn export.
+- `resume.pdf`: the current resume. Synced from Google Drive, along with `public/resume.pdf`.
+- `linkedin.pdf`: LinkedIn "Save to PDF" export. Synced from Google Drive.
 - `research-interests.md`: editable notes about current research interests.
+- `drive-manifest.json`: generated record of which Drive files were last synced. Do not edit by hand.
 - `sources.js`: generated file consumed by `lib/digitalTwinRag.js`.
 
-## Updating The Resume
+`linkedin.txt` is still read as a fallback if `linkedin.pdf` is missing.
 
-1. Replace `data/rag/resume.pdf`.
-2. Replace `public/resume.pdf` with the same file so the website download link stays current.
-3. Optionally run `npm run sync-rag` locally to inspect the generated source text.
-4. Commit and push.
-5. Vercel runs `npm run build`, which runs `npm run sync-rag` first through the `prebuild` script.
+## Updating The Resume Or LinkedIn
+
+Upload the new file to the shared Google Drive folder:
+
+- Resume: any PDF or Google Doc with `resume` in its name.
+- LinkedIn: on your profile, choose **More → Save to PDF** and upload the file as-is (`Profile.pdf`), or any PDF with `linkedin` in its name.
+
+If several files match, the most recently modified one wins.
+
+The weekly workflow in `.github/workflows/weekly-rag-refresh.yml` downloads changed files, regenerates `sources.js`, and opens a pull request summarizing what changed. Merge it to redeploy. See `PLAN.md` for architecture and one-time setup.
+
+To run the same steps locally, put `GOOGLE_SERVICE_ACCOUNT_JSON` and `GOOGLE_DRIVE_FOLDER_ID` in `.env`, then:
+
+```bash
+npm run fetch-drive
+npm run sync-rag
+```
+
+## Updating Manually
+
+Replace `resume.pdf` (and `public/resume.pdf`) or `linkedin.pdf`, then commit and push. Vercel runs `npm run build`, which runs `npm run sync-rag` first through the `prebuild` script.
 
 ## Updating Research Interests
 
@@ -25,9 +41,3 @@ Edit `data/rag/research-interests.md`, then run:
 ```bash
 npm run sync-rag
 ```
-
-## LinkedIn Refresh
-
-The monthly workflow in `.github/workflows/monthly-linkedin-refresh.yml` tries to fetch the public LinkedIn profile, update `linkedin.txt`, regenerate `sources.js`, and open a pull request if anything changed.
-
-LinkedIn frequently blocks unauthenticated scraping. If that happens, the workflow exits successfully and keeps the current LinkedIn source unchanged.

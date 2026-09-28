@@ -1,0 +1,56 @@
+name: Weekly RAG Refresh
+
+on:
+  schedule:
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+  repository_dispatch:
+    types: [drive-changed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: rag-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh-rag-sources:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch sources from Google Drive
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+        run: npm run fetch-drive
+
+      - name: Regenerate RAG sources
+        run: npm run sync-rag
+
+      - name: Summarize changes
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node scripts/summarize-rag-changes.mjs "$RUNNER_TEMP/pr-body.md"
+
+      - name: Open pull request if sources changed
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "Update RAG sources from Google Drive"
+          title: "Update chatbot sources from Google Drive"
+          body-path: ${{ runner.temp }}/pr-body.md
+          branch: weekly-rag-refresh
+          delete-branch: true

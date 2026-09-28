@@ -396,25 +396,23 @@ npx vercel --prod
 
 RAG source data is now generated from stable source files instead of being edited by hand.
 
-Resume workflow:
+Resume and LinkedIn workflow (automated, see `PLAN.md`):
 
-1. Replace `data/rag/resume.pdf` with the newest resume.
-2. Replace `public/resume.pdf` with the same file so the site download link stays current.
-3. Optionally run `npm run sync-rag` locally to inspect generated text.
-4. Commit and push.
-5. Vercel runs `npm run build`, and `prebuild` automatically runs `npm run sync-rag`.
+1. Upload the newest resume (PDF or Google Doc) and your LinkedIn "Save to PDF" export to the shared Google Drive folder.
+2. Every Monday, `.github/workflows/weekly-rag-refresh.yml` downloads any file that changed, runs `npm run sync-rag`, and opens a pull request with an AI-written summary of what changed. You can also run it by hand from the Actions tab.
+3. Review and merge the pull request. Vercel redeploys, and the chatbot answers from the new sources.
+
+Manual fallback:
+
+1. Replace `data/rag/resume.pdf` and `public/resume.pdf` (or `data/rag/linkedin.pdf`) with the new file.
+2. Optionally run `npm run sync-rag` locally to inspect generated text.
+3. Commit and push. Vercel runs `npm run build`, and `prebuild` automatically runs `npm run sync-rag`.
 
 Research-interest workflow:
 
 1. Edit `data/rag/research-interests.md`.
 2. Run `npm run sync-rag`.
 3. Commit and push.
-
-LinkedIn workflow:
-
-- The site keeps LinkedIn as a RAG source through `data/rag/linkedin.txt`.
-- A monthly GitHub Actions workflow attempts to refresh it from the public LinkedIn profile and opens a pull request if anything changes.
-- If LinkedIn blocks unauthenticated access, the workflow keeps the existing LinkedIn source unchanged.
 
 ---
 
