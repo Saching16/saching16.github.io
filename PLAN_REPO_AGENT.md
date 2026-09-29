@@ -26,6 +26,7 @@ Keep costs low by sending each question down the cheapest path that can answer i
 - **No LangGraph.** The agent is a single stateless loop with a handful of read-only tools, which is about 50 lines using the `openai` package. Revisit if the design grows into multiple cooperating agents, saved conversation state, or human approval steps.
 - **Jev picks the path.** Jev (TypeSafe AI, called through OpenRouter's Decisions API) classifies each question. It returns a choice with a probability and never writes text itself. It costs roughly $0.00003 per call and takes about 200 ms.
 - **Limits are per visitor, and the counts are shared.** Today's limiter allows 5 requests per minute per IP. Its counts live in each server instance's memory, so they aren't shared across instances and reset whenever an instance restarts. Step 5 replaces it with daily allowances per visitor, stored in Upstash Redis. A visitor is identified by a random ID in a signed cookie, with a higher per-IP limit as a backstop for cleared cookies. The expensive deep path gets its own smaller per-visitor allowance, plus a sitewide daily cap.
+- **Launch data is kept as anonymous counters.** Analytics events go to `console.info`, and most Vercel plans keep runtime logs only briefly, so the logs alone can't support a week-long launch review. Step 9 adds daily counters in the same Redis used for rate limits, plus a summary script. Only numbers are stored, under field names built from fixed lists, so no question or answer text can be kept. Unique visitors are counted with a HyperLogLog, which estimates how many different visitors there were without storing who they were.
 - **Code embeddings are deferred.** The repo is small enough that keyword search plus reading whole files should work. Embeddings get added only if the evaluation in Step 0 shows keyword search missing relevant code.
 
 ## Architecture
@@ -52,7 +53,12 @@ flowchart TD
     R -- low confidence or router error --> OP
   end
 
+  subgraph Insights[Anonymous analytics]
+    C1[(Daily counters and visitor HyperLogLogs in Redis)] --> C2[npm run twin-insights: weekly summary]
+  end
+
   E -. merge and redeploy .-> Request
+  Request -. counts, after the response is sent .-> C1
 ```
 
 ## Rough cost per question
@@ -65,6 +71,7 @@ flowchart TD
 | Repo deep dive         | 2 to 6 calls to the stronger model, 20,000 to 60,000 input tokens total | depends on the model; fill in after picking it |
 | Weekly overview        | One model call, only when a branch changes                              | a few cents at most                            |
 | Rate limiting          | 3 to 5 Redis commands per question                                      | $0 on Upstash's free tier at this traffic      |
+| Analytics counters     | One pipelined Redis request per question                                | $0 on Upstash's free tier at this traffic      |
 
 ## Working Through This Plan
 
@@ -85,7 +92,8 @@ These items need Sachin, because they involve his accounts, his judgment, or the
 | 5    | Adds Upstash Redis and `TWIN_VISITOR_SECRET` in Vercel, then runs the preview checks                         |
 | 6    | Creates an OpenRouter key and adds `OPENROUTER_API_KEY` to Vercel                                            |
 | 7    | Picks `REPO_AGENT_MODEL`, sets the OpenAI project budget limit, and confirms the measured cost is acceptable |
-| 9    | Turns on `REPO_AGENT_ENABLED` in production and reviews the first week of logs                               |
+| 9    | Sets `CHAT_ANALYTICS_SALT` in Vercel, runs the preview checks, and browses the insights keys in Upstash      |
+| 10   | Turns on `REPO_AGENT_ENABLED` in production and reviews the first week with `npm run twin-insights`          |
 
 ---
 
@@ -460,28 +468,79 @@ The deep path is not built yet. Until Step 7, `repo_deep` falls back to the over
 
 ---
 
-## Step 9: Launch and Tune
+## Step 9: Durable Anonymous Analytics
+
+The launch review in Step 10 needs a week of data, and runtime logs may not keep it that long. This step stores anonymous daily counts in the Upstash Redis from Step 5 and adds a script that summarizes them. [PLAN_INTERACTIVE_TWIN.md](PLAN_INTERACTIVE_TWIN.md) later adds its own fields to the same counters.
+
+### Implementation
+
+- Check how long your Vercel plan keeps runtime logs, and write it in `docs/deployment.md`.
+- If the Redis client from Step 5 lives inside `lib/rateLimiter.js`, move it into `lib/redis.js` so both features import it.
+- Keys, all under the existing `twin:` prefix:
+  - `twin:insights:<UTC date>`: a hash of counters for that day,
+  - `twin:insights:<UTC date>:visitors`: a HyperLogLog of that day's visitors,
+  - `twin:insights:<UTC date>:limited`: a HyperLogLog of visitors who hit any rate limit that day,
+  - every key expires 180 days after it's created.
+- Counter fields for each chat event:
+  - `questions`, `outcome:<outcome>`, `route:<route>`, `router_fallback` (low confidence, timeout, error, or missing key), `limiter:<backend>`,
+  - `limit:<limit>` for rate-limited requests, and `deep_limited` when a deep question was downgraded to the overview path,
+  - `deep_requests`, `deep_round_limit` (deep requests that hit the 6-round cap), and `deep_cost_microusd`, the estimated deep-path cost in millionths of a dollar so it can be counted with a whole-number increment.
+- Add `lib/analyticsStore.js`:
+  - `toInsightFields(event)` turns a logged event into the list of counter fields to increment. Every value used in a field name is checked against a fixed list (outcomes, routes, limiter backends, and limit names). An unknown value becomes `other`. That check is what guarantees free text can never become a field name.
+  - `getVisitorKey(event)` returns `visitorHash` when there is one and `clientHash` otherwise. It's only ever added to a HyperLogLog, from which it can't be read back.
+  - `recordInsights(event, { redis, date })` sends all increments, the HyperLogLog additions, and the expiry settings as one pipelined request. Tests pass a fake `redis`.
+- `logDigitalTwinEvent` keeps writing to `console.info` and also calls `recordInsights` through `after()` from `next/server`, so the write happens after the response is sent. Confirm `after()` works with the streamed responses from Step 8. If Redis is missing, slow, or fails, log one warning and carry on. Analytics must never break a request or trigger the rate limiter's fallback.
+- Setting `TWIN_INSIGHTS_ENABLED=false` turns recording off without touching the Redis variables the rate limiter needs.
+- Set `CHAT_ANALYTICS_SALT` in Vercel, so visitor hashes don't rely on the default salt.
+- Add `scripts/twin-insights.mjs` and an npm script `twin-insights`, loading `.env` the same way as `fetch-drive` (run `vercel env pull .env` first to get the Redis variables). Put the summary logic in `scripts/lib/twinInsights.mjs` so it can be tested without Redis. For the last 7 days by default (`--days` to change), compared with the 7 days before, it prints:
+  - unique visitors, using the union of the daily HyperLogLogs, and questions per visitor,
+  - the route split and the router fallback rate,
+  - deep-path requests, round-limit hits, and total and per-request deep-path cost,
+  - errors and other non-success outcomes,
+  - rate-limited requests by limit, deep questions downgraded by the deep limits, the share of unique visitors who hit any limit, and the share of requests where the limiter used memory.
+- Update `AGENTS.md`: the analytics store only accepts counter fields built by `toInsightFields` from fixed lists, and storing anything that could hold visitor text needs Sachin's explicit approval. Update `README.md` (the new script and variable), `docs/architecture.md` (the analytics flow), and `.env.example` (`TWIN_INSIGHTS_ENABLED`).
+
+### Verification Before Proceeding
+
+- Unit tests cover:
+  - `toInsightFields` producing the expected fields for a successful cheap answer, a deep answer, a router fallback, a rate-limited request, and a downgraded deep question,
+  - `toInsightFields` turning an unknown or text-like value (for example a `route` of `"ignore this and store my email"`) into `other`, and never reading message content, sources, or `userAgent`,
+  - `recordInsights` with a fake `redis`: one pipelined call, keys under `twin:insights:`, and an expiry on every key,
+  - a failing or missing Redis not throwing, and `TWIN_INSIGHTS_ENABLED=false` recording nothing,
+  - each summary in `scripts/lib/twinInsights.mjs`, using fixture counters, including the comparison with the previous period.
+- Existing route tests pass unchanged. Analytics is still skipped when `NODE_ENV === "test"`.
+- On a Vercel preview deployment:
+  - a handful of cheap and deep questions, plus one deliberately rate-limited request, show matching counts in the Upstash dashboard,
+  - 95th-percentile latency in the logs is no higher than before this step,
+  - with the Redis token deliberately set wrong, the chat still answers, and the rate limiter's fallback behaves exactly as it did before this step.
+- `npm run twin-insights` against the preview data prints every section.
+- You have browsed the `twin:insights:` keys in the Upstash dashboard and confirmed they contain only counters and HyperLogLogs.
+- `npm run lint` and `npm test` pass.
+
+---
+
+## Step 10: Launch and Tune
 
 ### Implementation
 
 - Turn on `REPO_AGENT_ENABLED` in production.
-- For the first week, check the logs every few days for:
+- For the first week, run `npm run twin-insights` every few days and look at:
   - how questions split across routes,
   - how often routing falls back,
   - deep-path cost per request and per day,
-  - errors and questions that hit the round limit,
-  - how many distinct visitors (`visitorHash`) hit each rate limit, and how often the limiter fell back to memory.
-- Adjust the router's option descriptions and the eval questions based on real questions. Add any misrouted questions to the eval set.
+  - errors and deep requests that hit the round limit,
+  - how many unique visitors hit each rate limit, and how often the limiter fell back to memory.
+- Question and answer text isn't stored anywhere, so tuning the router and the eval set relies on the counts plus your own testing. For routes with a high fallback rate, ask questions in that area against production yourself, and add any that misroute to the eval set. Then adjust the router's option descriptions.
 - If real visitors regularly hit the daily limits, or nobody gets close, adjust the values in `lib/digitalTwinConfig.js`.
 
 ### Verification
 
 - After one week:
   - total spending is within budget,
-  - no attribution errors appear in a manual review of about 20 real deep answers,
+  - no attribution errors appear in a manual review of about 20 deep answers to questions you ask against production, covering attribution traps and each branch,
   - fewer than 10% of requests fall back because of router errors or timeouts,
   - fewer than 5% of visitors hit the daily question limit, and the limiter used memory instead of Redis for under 1% of requests.
-- If keyword search misses relevant code in real questions, open a follow-up plan for code embeddings.
+- If keyword search misses relevant code in your production testing, or deep requests often hit the round limit, open a follow-up plan for code embeddings.
 
 ---
 
@@ -497,57 +556,65 @@ Each piece can be switched off without a code change, and questions still get an
 | Weekly job keeps failing                         | Disable the workflow in the Actions tab      | Chatbot keeps serving the last merged snapshot                          |
 | Redis is failing or slow                         | Remove the Redis variables from Vercel       | Limits use per-instance memory, which is approximate                    |
 | Limits are too strict or too loose               | Change `lib/digitalTwinConfig.js` and deploy | New limits apply from the next request                                  |
+| Insights recording is slow or failing            | Set `TWIN_INSIGHTS_ENABLED=false` in Vercel  | Events go only to console logs. Rate limits keep using Redis            |
 
 Vercel environment variable changes only take effect on the next deployment, so redeploy after changing one.
 
 ## Files
 
-| File                                                                                                                                                                                        | Step       | New or changed                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------- |
-| `tests/fixtures/twin-eval-questions.json`                                                                                                                                                   | 0          | New                                                                                 |
-| `scripts/eval-twin.mjs`                                                                                                                                                                     | 0          | New                                                                                 |
-| `.gitignore`                                                                                                                                                                                | 0          | Changed: add `eval-results/`                                                        |
-| `data/repos/config.js`                                                                                                                                                                      | 1          | New                                                                                 |
-| `data/projects.js`                                                                                                                                                                          | 1          | Changed: add `repo` field                                                           |
-| `scripts/sync-repo-snapshots.mjs`, `scripts/lib/repoSnapshot.mjs`                                                                                                                           | 2          | New                                                                                 |
-| `data/repos/manifest.json`, `data/repos/<slug>/snapshot.json`                                                                                                                               | 2          | New, generated                                                                      |
-| `scripts/build-repo-overview.mjs`                                                                                                                                                           | 3          | New                                                                                 |
-| `data/repos/<slug>/overview.md`                                                                                                                                                             | 3          | New, generated                                                                      |
-| `scripts/sync-rag-sources.mjs`                                                                                                                                                              | 3          | Changed: add overview sources                                                       |
-| `lib/digitalTwinRag.js`                                                                                                                                                                     | 3, 6       | Changed: prompt rules, then split into career and overview paths                    |
-| `.github/workflows/weekly-rag-refresh.yml`                                                                                                                                                  | 4          | Changed: repo steps, PR title                                                       |
-| `scripts/summarize-rag-changes.mjs`                                                                                                                                                         | 4          | Changed: "Repo changes" section                                                     |
-| `data/repos/README.md`, `data/rag/README.md`                                                                                                                                                | 4          | New, and changed to link it                                                         |
-| `lib/visitorId.js`                                                                                                                                                                          | 5          | New                                                                                 |
-| `lib/rateLimiter.js`                                                                                                                                                                        | 5          | Rewritten: Redis limits with in-memory fallback                                     |
-| `docs/architecture.md`, `docs/digital-twin-api.md`, `README.md`, `AGENTS.md`, `.env.example`                                                                                                | 5          | Changed: rate-limit docs and new variables                                          |
-| `lib/digitalTwinRouter.js`                                                                                                                                                                  | 6          | New                                                                                 |
-| `lib/digitalTwinAnalytics.js`                                                                                                                                                               | 5, 6, 8    | Changed: limit, route, cost, and outcome fields                                     |
-| `lib/repoAgent.js`, `lib/repoSnapshot.js`                                                                                                                                                   | 7          | New                                                                                 |
-| `lib/digitalTwinConfig.js`                                                                                                                                                                  | 5, 7       | Changed: visitor limits, then agent limits                                          |
-| `app/api/digital-twin/route.js`                                                                                                                                                             | 0, 5 to 8  | Changed: eval bypass, limits and cookie, routing, `maxDuration`, streaming          |
-| `components/DigitalTwinChat.js`                                                                                                                                                             | 5, 8       | Changed: limit messages, then streaming, source links, copy                         |
-| `package.json`                                                                                                                                                                              | 0, 2, 3, 5 | Changed: `eval-twin`, `sync-repos`, `build-repo-overview` scripts; Upstash packages |
-| Tests: `tests/repoSnapshot.test.js`, `tests/visitorId.test.js`, `tests/rateLimiter.test.js`, `tests/digitalTwinRouter.test.js`, `tests/repoAgent.test.js`, `tests/digitalTwinRoute.test.js` | 0 to 8     | New, and changed for the route                                                      |
+| File                                                                                                                                                                                                                                                      | Step          | New or changed                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------- |
+| `tests/fixtures/twin-eval-questions.json`                                                                                                                                                                                                                 | 0             | New                                                                                                      |
+| `scripts/eval-twin.mjs`                                                                                                                                                                                                                                   | 0             | New                                                                                                      |
+| `.gitignore`                                                                                                                                                                                                                                              | 0             | Changed: add `eval-results/`                                                                             |
+| `data/repos/config.js`                                                                                                                                                                                                                                    | 1             | New                                                                                                      |
+| `data/projects.js`                                                                                                                                                                                                                                        | 1             | Changed: add `repo` field                                                                                |
+| `scripts/sync-repo-snapshots.mjs`, `scripts/lib/repoSnapshot.mjs`                                                                                                                                                                                         | 2             | New                                                                                                      |
+| `data/repos/manifest.json`, `data/repos/<slug>/snapshot.json`                                                                                                                                                                                             | 2             | New, generated                                                                                           |
+| `scripts/build-repo-overview.mjs`                                                                                                                                                                                                                         | 3             | New                                                                                                      |
+| `data/repos/<slug>/overview.md`                                                                                                                                                                                                                           | 3             | New, generated                                                                                           |
+| `scripts/sync-rag-sources.mjs`                                                                                                                                                                                                                            | 3             | Changed: add overview sources                                                                            |
+| `lib/digitalTwinRag.js`                                                                                                                                                                                                                                   | 3, 6          | Changed: prompt rules, then split into career and overview paths                                         |
+| `.github/workflows/weekly-rag-refresh.yml`                                                                                                                                                                                                                | 4             | Changed: repo steps, PR title                                                                            |
+| `scripts/summarize-rag-changes.mjs`                                                                                                                                                                                                                       | 4             | Changed: "Repo changes" section                                                                          |
+| `data/repos/README.md`, `data/rag/README.md`                                                                                                                                                                                                              | 4             | New, and changed to link it                                                                              |
+| `lib/visitorId.js`                                                                                                                                                                                                                                        | 5             | New                                                                                                      |
+| `lib/rateLimiter.js`                                                                                                                                                                                                                                      | 5, 9          | Rewritten: Redis limits with in-memory fallback, then Redis client moved out if needed                   |
+| `lib/redis.js`                                                                                                                                                                                                                                            | 9             | New, only if the Redis client needs moving out of `lib/rateLimiter.js`                                   |
+| `lib/analyticsStore.js`                                                                                                                                                                                                                                   | 9             | New                                                                                                      |
+| `scripts/twin-insights.mjs`, `scripts/lib/twinInsights.mjs`                                                                                                                                                                                               | 9             | New                                                                                                      |
+| `README.md`, `AGENTS.md`, `docs/architecture.md`, `docs/deployment.md`, `.env.example`                                                                                                                                                                    | 9             | Changed: analytics flow, log retention, new script and variable                                          |
+| `docs/architecture.md`, `docs/digital-twin-api.md`, `README.md`, `AGENTS.md`, `.env.example`                                                                                                                                                              | 5             | Changed: rate-limit docs and new variables                                                               |
+| `lib/digitalTwinRouter.js`                                                                                                                                                                                                                                | 6             | New                                                                                                      |
+| `lib/digitalTwinAnalytics.js`                                                                                                                                                                                                                             | 5, 6, 8, 9    | Changed: limit, route, cost, and outcome fields, then writes to the analytics counters                   |
+| `lib/repoAgent.js`, `lib/repoSnapshot.js`                                                                                                                                                                                                                 | 7             | New                                                                                                      |
+| `lib/digitalTwinConfig.js`                                                                                                                                                                                                                                | 5, 7          | Changed: visitor limits, then agent limits                                                               |
+| `app/api/digital-twin/route.js`                                                                                                                                                                                                                           | 0, 5 to 8     | Changed: eval bypass, limits and cookie, routing, `maxDuration`, streaming                               |
+| `components/DigitalTwinChat.js`                                                                                                                                                                                                                           | 5, 8          | Changed: limit messages, then streaming, source links, copy                                              |
+| `package.json`                                                                                                                                                                                                                                            | 0, 2, 3, 5, 9 | Changed: `eval-twin`, `sync-repos`, `build-repo-overview`, and `twin-insights` scripts; Upstash packages |
+| Tests: `tests/repoSnapshot.test.js`, `tests/visitorId.test.js`, `tests/rateLimiter.test.js`, `tests/digitalTwinRouter.test.js`, `tests/repoAgent.test.js`, `tests/digitalTwinRoute.test.js`, `tests/analyticsStore.test.js`, `tests/twinInsights.test.js` | 0 to 9        | New, and changed for the route                                                                           |
 
 ## Environment Variables
 
-| Name                                                                                                   | Where                                                          | Purpose                                                              |
-| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `OPENROUTER_API_KEY`                                                                                   | Vercel, `.env`                                                 | Jev routing calls                                                    |
-| `REPO_AGENT_MODEL`                                                                                     | Vercel, `.env`                                                 | Model used for the deep path                                         |
-| `REPO_AGENT_ENABLED`                                                                                   | Vercel, `.env`                                                 | Turns on the deep path                                               |
-| `REPO_AGENT_DAILY_LIMIT`                                                                               | Vercel, `.env`                                                 | Sitewide deep requests allowed per day, default 100                  |
-| `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (or `KV_REST_API_URL` and `KV_REST_API_TOKEN`) | Added to Vercel by the Upstash integration, pulled into `.env` | Shared rate-limit counts                                             |
-| `TWIN_VISITOR_SECRET`                                                                                  | Vercel, `.env`                                                 | Signs the visitor cookie                                             |
-| `DISABLE_RATE_LIMIT`                                                                                   | `.env` only, never Vercel                                      | Skips limits under `npm run dev` for the eval; ignored in production |
-| `OPENAI_API_KEY`                                                                                       | Already set in Vercel and GitHub                               | Now also used by the weekly overview step                            |
+| Name                                                                                                   | Where                                                          | Purpose                                                                       |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `OPENROUTER_API_KEY`                                                                                   | Vercel, `.env`                                                 | Jev routing calls                                                             |
+| `REPO_AGENT_MODEL`                                                                                     | Vercel, `.env`                                                 | Model used for the deep path                                                  |
+| `REPO_AGENT_ENABLED`                                                                                   | Vercel, `.env`                                                 | Turns on the deep path                                                        |
+| `REPO_AGENT_DAILY_LIMIT`                                                                               | Vercel, `.env`                                                 | Sitewide deep requests allowed per day, default 100                           |
+| `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (or `KV_REST_API_URL` and `KV_REST_API_TOKEN`) | Added to Vercel by the Upstash integration, pulled into `.env` | Shared rate-limit counts                                                      |
+| `TWIN_VISITOR_SECRET`                                                                                  | Vercel, `.env`                                                 | Signs the visitor cookie                                                      |
+| `DISABLE_RATE_LIMIT`                                                                                   | `.env` only, never Vercel                                      | Skips limits under `npm run dev` for the eval; ignored in production          |
+| `TWIN_INSIGHTS_ENABLED`                                                                                | Vercel, `.env`                                                 | Anonymous analytics counters in Redis. On unless set to `false`               |
+| `CHAT_ANALYTICS_SALT`                                                                                  | Already optional in Vercel and `.env`                          | Salts visitor hashes. Set it in production rather than relying on the default |
+| `OPENAI_API_KEY`                                                                                       | Already set in Vercel and GitHub                               | Now also used by the weekly overview step                                     |
 
 ## Out of Scope
 
 - Other repos, including private ones. Private repos would need a GitHub token in the Action and a decision about quoting private code to visitors.
 - Tags, pull requests, issues, and the upstream `RecursiveMAS/RecursiveMAS` repo's own branches.
 - Full commit history. Only the saved commit logs described in Step 2 are available.
-- Code embeddings. See Step 9.
+- Code embeddings. See Step 10.
+- Storing question or answer text, transcripts, or any per-visitor profile. See Step 9.
 - Saving conversations on the server between requests.
 - LangGraph. See Decisions.

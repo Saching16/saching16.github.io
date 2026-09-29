@@ -25,6 +25,7 @@ This plan starts after [PLAN_REPO_AGENT.md](PLAN_REPO_AGENT.md) is complete. It 
 | Agent loop in `lib/repoAgent.js`                                                 | Step 7               | Structured final answer on the deep path                                           |
 | Streamed events (`status`, `answer`, `error`)                                    | Step 8               | New fields on the `answer` event                                                   |
 | `visitorHash`, `limit`, route, cost, and outcome fields in `logDigitalTwinEvent` | Steps 5, 6, and 8    | New analytics fields and unique-visitor counts                                     |
+| Anonymous counters in `lib/analyticsStore.js` and `npm run twin-insights`        | Step 9               | Extended with this plan's fields in Step 7                                         |
 
 Before starting, compare this table with what was actually built. If a name, file, or event format changed during the repo agent work, update this plan first.
 
@@ -40,7 +41,7 @@ Before starting, compare this table with what was actually built. If a name, fil
 - **The greeting and starter questions are static.** They come from `data/twinStarters.js`, not a model call. Opening the chat costs nothing and uses none of the visitor's rate limit.
 - **The chat never opens itself.** A launcher button is always visible, but the panel only opens when the visitor clicks it.
 - **Conversations aren't saved.** State lives in React for the current page view, as it does today. A reload starts fresh.
-- **Insights come from anonymous counts only.** The goal is to learn what kinds of visitors come, what they ask about, and where the twin can't answer. Each question is tagged with a topic from a fixed list and a yes-or-no "had enough context" flag, and only those tags are stored. They're kept as daily counters in the Upstash Redis the repo agent plan already adds. No question text, transcripts, raw IPs, or company lookups from IP addresses. Unique visitors are counted with a HyperLogLog, which holds an estimate of how many different visitors there were but not who they were. Identity only ever comes from a note the visitor chooses to send.
+- **Insights come from anonymous counts only.** The goal is to learn what kinds of visitors come, what they ask about, and where the twin can't answer. Each question is tagged with a topic from a fixed list and a yes-or-no "had enough context" flag, and only those tags are stored. They're added to the anonymous daily counters that the repo agent plan's Step 9 keeps in Redis. No question text, transcripts, raw IPs, or company lookups from IP addresses. Unique visitors are counted with a HyperLogLog, which holds an estimate of how many different visitors there were but not who they were. Identity only ever comes from a note the visitor chooses to send.
 
 ## Architecture
 
@@ -82,14 +83,14 @@ flowchart TD
 
 ## Rough cost
 
-| Item                                        | Approximate cost                                                                                                                   |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Greeting and starter questions              | $0, static                                                                                                                         |
-| Structured answer fields                    | About 60 extra output tokens per answer, roughly $0.00004 on `gpt-4o-mini`                                                         |
-| Visitor type in the prompt and router input | A few dozen input tokens, effectively $0                                                                                           |
-| Page actions                                | $0 beyond the answer itself                                                                                                        |
-| Notes                                       | $0 on Resend's free tier, which covers far more notes than a personal site will get. Confirm current limits when setting up        |
-| Analytics counters                          | One extra pipelined Redis request per question, on the Upstash Redis from the repo agent plan. $0 on the free tier at this traffic |
+| Item                                        | Approximate cost                                                                                                            |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Greeting and starter questions              | $0, static                                                                                                                  |
+| Structured answer fields                    | About 60 extra output tokens per answer, roughly $0.00004 on `gpt-4o-mini`                                                  |
+| Visitor type in the prompt and router input | A few dozen input tokens, effectively $0                                                                                    |
+| Page actions                                | $0 beyond the answer itself                                                                                                 |
+| Notes                                       | $0 on Resend's free tier, which covers far more notes than a personal site will get. Confirm current limits when setting up |
+| Analytics counters                          | A few more fields in the repo agent plan's existing pipelined Redis request. Effectively $0                                 |
 
 The main cost risk is indirect: follow-up and starter buttons make it easy to send more questions, some of which take the deep path. Step 8 checks this against real traffic.
 
@@ -376,61 +377,40 @@ Page actions (Step 5) need the chat to stay visible while the page scrolls behin
 
 ---
 
-## Step 7: Durable Anonymous Analytics
+## Step 7: Visitor Insights
 
-Analytics events currently go to `console.info`, which means Vercel's runtime logs. Most Vercel plans keep those only briefly, so they can't show trends over weeks. This step keeps anonymous daily counts in the Upstash Redis that the repo agent plan added for rate limits (its Step 5), and adds a script that summarizes them. It has to exist before launch, or the launch weeks' data is lost.
-
-Counters are used instead of storing individual events. Only numbers are stored, under field names built from fixed lists, so there is no place visitor text could end up even by mistake. No new service or npm dependency is needed.
+The repo agent plan's Step 9 already stores anonymous daily counters in Redis (`lib/analyticsStore.js`) and summarizes them with `npm run twin-insights`. This step adds the fields from this plan to those counters, so the launch review can see who visits, what they ask about, and where the twin can't answer. Only numbers are stored, under field names built from fixed lists, so no visitor text can end up in the store.
 
 ### Implementation
 
-- Check how long your Vercel plan keeps runtime logs, and write it in `docs/deployment.md`.
-- Reuse the Redis client from the repo agent plan's Step 5. If it lives inside `lib/rateLimiter.js`, move it into `lib/redis.js` so both features import it.
-- Keys, all under the `twin:` prefix the rate limiter already uses:
-  - `twin:insights:<UTC date>`: a hash of counters for that day,
-  - `twin:insights:<UTC date>:visitors`: a HyperLogLog of that day's visitors, for counting unique visitors. A HyperLogLog stores an estimate of how many different values were added, not the values, so no visitor identifier can be read back from it.
-  - `twin:insights:<UTC date>:limited`: a HyperLogLog of visitors who hit any rate limit that day.
-  - Every key expires 180 days after it's created.
-- Counter fields for each chat event:
-  - `questions`, `outcome:<outcome>`, `route:<route>`, `intent:<visitor type or skipped>`, `trigger:<trigger>`, `kind:<answer kind>`,
+- New counter fields for each chat event, in the existing `twin:insights:<UTC date>` hash:
+  - `intent:<visitor type or skipped>`, `trigger:<trigger>`, `kind:<answer kind>`,
   - `topic:<topic>` and `topic:<topic>:intent:<visitor type or skipped>`,
   - `gap:<topic>` when `hadEnoughContext` is false, and `gap_unknown` when it's null,
-  - `followup_shown`, `action:<type>` for each action returned, and `limit:<limit>` for rate-limited requests,
-  - `deep_requests` and `deep_cost_microusd`, the estimated deep-path cost in millionths of a dollar so it can be counted with a whole-number increment.
-- Counter fields for each note event: `note:<outcome>`, and `note_with_conversation` when a conversation was included.
-- Add `lib/analyticsStore.js`:
-  - `toInsightFields(event)` turns a logged event into the list of counter fields to increment. Every value used in a field name is checked against its fixed list (outcomes, routes, visitor types, triggers, answer kinds, `TWIN_TOPICS`, action types, and limit names). An unknown value becomes `other`. That check is what guarantees free text can never become a field name.
-  - `getVisitorKey(event)` returns the `visitorHash` from the repo agent plan's Step 5 when there is one, and the `clientHash` otherwise. It's only ever added to a HyperLogLog.
-  - `recordInsights(event, { redis, date })` sends all increments, the HyperLogLog additions, and the expiry settings as one pipelined request. Tests pass a fake `redis`.
-- `logDigitalTwinEvent` and the `leave_note` logging from Step 6 keep writing to `console.info` as they do now, and also call `recordInsights` through `after()` from `next/server`, so the write happens after the response is sent. Confirm `after()` works with the streamed responses from the repo agent plan. If Redis is missing, slow, or fails, log one warning and carry on. Analytics must never break a request or trigger the rate limiter's fallback.
-- Setting `TWIN_INSIGHTS_ENABLED=false` turns recording off without touching the Redis variables the rate limiter needs.
-- Add `scripts/twin-insights.mjs` and an npm script `twin-insights`, loading `.env` the same way as `fetch-drive` (run `vercel env pull .env` first to get the Redis variables). Put the summary logic in `scripts/lib/twinInsights.mjs` so it can be tested without Redis. For the last 7 days by default (`--days` to change), compared with the 7 days before, it prints:
-  - unique visitors, using the union of the daily HyperLogLogs, and questions per visitor,
+  - `followup_shown`, and `action:<type>` for each action returned.
+- New counter fields for each note event: `note:<outcome>`, and `note_with_conversation` when a conversation was included.
+- In `lib/analyticsStore.js`, extend `toInsightFields` with these fields, and add the new fixed lists it checks values against: visitor types, triggers, answer kinds, `TWIN_TOPICS`, action types, and note outcomes. An unknown value still becomes `other`.
+- The `leave_note` logging from Step 6 calls `recordInsights` through `after()`, the same way `logDigitalTwinEvent` already does. Notes add to the daily visitor count using the IP-based `clientHash`, since the visitor cookie isn't sent to the note route.
+- Extend `scripts/lib/twinInsights.mjs` so `npm run twin-insights` also prints:
   - the visitor type split, including "skipped",
   - question topics, broken down by visitor type,
   - **content gaps**: for each topic, the share of questions where the twin didn't have enough context, sorted from highest to lowest. This is the list of what to add to the sources.
   - the split of `typed`, `starter`, and `follow_up` questions, answer kinds, how often a follow-up was shown, and action types,
-  - the route split, deep-path requests, and total and per-request deep-path cost,
-  - rate-limited requests by limit, and the share of unique visitors who hit any limit,
   - note outcomes.
 - Add a line at the bottom of the chat panel: "Questions aren't stored. The site keeps anonymous counts of topics." Link it to a short "Privacy" paragraph in the footer saying the same, that the chat sets a cookie holding only a random ID used for rate limits, and that notes are emailed to Sachin and not stored.
-- Update `AGENTS.md`: the analytics store only accepts counter fields built by `toInsightFields` from fixed lists, and storing anything that could hold visitor text needs Sachin's explicit approval. Update `README.md` (the new script), `docs/architecture.md` (the analytics flow), and `docs/deployment.md` (log retention and running the insights script).
+- Update `docs/architecture.md` with the new counter fields.
 
 ### Verification Before Proceeding
 
 - Unit tests cover:
-  - `toInsightFields` producing the expected fields for a chat event, a rate-limited event, and a note event,
-  - `toInsightFields` turning an unknown or text-like value (for example a `topic` of `"ignore this and store my email"`) into `other`, and never reading `message`, `answer`, `sources`, or `userAgent`,
-  - `recordInsights` with a fake `redis`: one pipelined call, keys under `twin:insights:`, and an expiry on every key,
-  - a failing or missing Redis not throwing, and `TWIN_INSIGHTS_ENABLED=false` recording nothing,
-  - each summary in `scripts/lib/twinInsights.mjs`, using fixture counters, including the content-gap ranking and the comparison with the previous period.
-- Existing route tests pass unchanged. Analytics is still skipped when `NODE_ENV === "test"`.
-- On a Vercel preview deployment:
-  - asking 5 questions and sending 1 note shows the matching counts in the Upstash dashboard,
-  - 95th-percentile latency in the logs is no higher than before this step,
-  - with the Redis token deliberately set wrong, the chat still answers, and the rate limiter's fallback behaves exactly as it did before this step.
-- `npm run twin-insights` against the preview data prints every section.
-- You have browsed the `twin:insights:` keys in the Upstash dashboard and confirmed they contain only counters and HyperLogLogs.
+  - `toInsightFields` producing the new fields for a chat event with a visitor type, one without, a `clarify` answer, an answer with actions, and each note outcome,
+  - `toInsightFields` turning an unknown or text-like value (for example a `topic` of `"ignore this and store my email"`) into `other`,
+  - the existing fields from the repo agent plan still being produced unchanged,
+  - the new summaries in `scripts/lib/twinInsights.mjs`, using fixture counters, including the content-gap ranking.
+- Existing route and analytics tests pass unchanged.
+- On a Vercel preview deployment, asking 5 questions with different visitor types and sending 1 note shows the matching new counts in the Upstash dashboard.
+- `npm run twin-insights` against the preview data prints both the repo agent plan's sections and the new ones.
+- You have browsed the `twin:insights:` keys in the Upstash dashboard and confirmed they still contain only counters and HyperLogLogs.
 
 ---
 
@@ -499,27 +479,23 @@ The repo agent plan's switches (`REPO_AGENT_ENABLED`, `OPENROUTER_API_KEY`) stil
 | `lib/digitalTwinConfig.js`                                                                                                                                                                                                                                        | 2, 5, 6       | Changed: topic list, allowed actions, note rate limit                             |
 | `lib/requestGuards.js`                                                                                                                                                                                                                                            | 6             | New: shared origin check                                                          |
 | `lib/leaveNote.js`, `app/api/leave-note/route.js`                                                                                                                                                                                                                 | 6             | New                                                                               |
-| `lib/analyticsStore.js`                                                                                                                                                                                                                                           | 7             | New                                                                               |
-| `lib/rateLimiter.js`                                                                                                                                                                                                                                              | 6, 7          | Changed: note limit under `twin:note:`, Redis client moved out if needed          |
-| `lib/redis.js`                                                                                                                                                                                                                                                    | 7             | New, only if the Redis client needs moving out of `lib/rateLimiter.js`            |
-| `scripts/twin-insights.mjs`, `scripts/lib/twinInsights.mjs`                                                                                                                                                                                                       | 7             | New                                                                               |
-| `package.json`                                                                                                                                                                                                                                                    | 7             | Changed: `twin-insights` script                                                   |
-| `.env.example`, `README.md`, `AGENTS.md`                                                                                                                                                                                                                          | 6, 7          | Changed: note and insights variables, guardrails, new script                      |
+| `lib/analyticsStore.js`                                                                                                                                                                                                                                           | 7             | Changed: new counter fields and fixed lists                                       |
+| `lib/rateLimiter.js`                                                                                                                                                                                                                                              | 6             | Changed: note limit under `twin:note:`                                            |
+| `scripts/lib/twinInsights.mjs`                                                                                                                                                                                                                                    | 7             | Changed: visitor, topic, content-gap, and note summaries                          |
+| `.env.example`, `README.md`, `AGENTS.md`                                                                                                                                                                                                                          | 6             | Changed: note variables and guardrails                                            |
 | `docs/digital-twin-api.md`, `docs/architecture.md`, `docs/content.md`, `docs/deployment.md`                                                                                                                                                                       | 2, 3, 6, 7    | Changed                                                                           |
-| Tests: `tests/digitalTwinRag.test.js`, `tests/digitalTwinRoute.test.js`, `tests/digitalTwinRouter.test.js`, `tests/twinStarters.test.js`, `tests/leaveNote.test.js`, `tests/leaveNoteRoute.test.js`, `tests/analyticsStore.test.js`, `tests/twinInsights.test.js` | 1 to 7        | New, and changed for the chat route                                               |
+| Tests: `tests/digitalTwinRag.test.js`, `tests/digitalTwinRoute.test.js`, `tests/digitalTwinRouter.test.js`, `tests/twinStarters.test.js`, `tests/leaveNote.test.js`, `tests/leaveNoteRoute.test.js`, `tests/analyticsStore.test.js`, `tests/twinInsights.test.js` | 1 to 7        | New, and changed for the chat route and analytics                                 |
 
 ## Environment Variables
 
-| Name                    | Where                                 | Purpose                                                                                                     |
-| ----------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `TWIN_ACTIONS_ENABLED`  | Vercel, `.env`                        | Page and note actions. On unless set to `false`                                                             |
-| `RESEND_API_KEY`        | Vercel, `.env`                        | Sending notes. Leaving it unset turns notes off                                                             |
-| `NOTE_TO_EMAIL`         | Vercel, `.env`                        | Where notes are delivered                                                                                   |
-| `NOTE_FROM_EMAIL`       | Vercel, `.env`                        | Sender address, on a domain verified in Resend or Resend's test sender                                      |
-| `TWIN_INSIGHTS_ENABLED` | Vercel, `.env`                        | Anonymous analytics counters in Redis. On unless set to `false`                                             |
-| `CHAT_ANALYTICS_SALT`   | Already optional in Vercel and `.env` | Salts the visitor hashes added to the HyperLogLogs. Set it in production rather than relying on the default |
+| Name                   | Where          | Purpose                                                                |
+| ---------------------- | -------------- | ---------------------------------------------------------------------- |
+| `TWIN_ACTIONS_ENABLED` | Vercel, `.env` | Page and note actions. On unless set to `false`                        |
+| `RESEND_API_KEY`       | Vercel, `.env` | Sending notes. Leaving it unset turns notes off                        |
+| `NOTE_TO_EMAIL`        | Vercel, `.env` | Where notes are delivered                                              |
+| `NOTE_FROM_EMAIL`      | Vercel, `.env` | Sender address, on a domain verified in Resend or Resend's test sender |
 
-The Redis variables and `TWIN_VISITOR_SECRET` come from the repo agent plan and aren't repeated here.
+The Redis variables, `TWIN_VISITOR_SECRET`, `TWIN_INSIGHTS_ENABLED`, and `CHAT_ANALYTICS_SALT` come from the repo agent plan and aren't repeated here.
 
 ## Out of Scope
 
