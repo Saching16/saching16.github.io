@@ -61,3 +61,9 @@ Run `npm test` and `npm run lint` before finishing any change. There is no CI jo
 ## Documentation
 
 When you change behavior, update the matching doc: [README.md](README.md) for setup and scripts, [docs/](docs/) for architecture, the API, content, and deployment, and [data/rag/README.md](data/rag/README.md) for the source-update workflow.
+
+## Cursor Cloud specific instructions
+
+- Install dependencies with `npm ci`. The Cloud Agent image provides Node.js 22, which is enough for the dev server, tests, lint, and production build. The weekly GitHub Action uses Node.js 24.
+- `npm run dev` serves the site at http://localhost:3000. If port 3000 is already accepting connections, reuse that server.
+- The homepage, Vitest suite, ESLint, and `npm run build` do not need secrets. `POST /api/digital-twin` returns `Missing OPENAI_API_KEY in environment.` until that variable is set. `GOOGLE_SERVICE_ACCOUNT_JSON` and `GOOGLE_DRIVE_FOLDER_ID` are only required for `npm run fetch-drive`.
