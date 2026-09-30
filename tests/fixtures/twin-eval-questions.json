@@ -1,0 +1,292 @@
+[
+  {
+    "id": "career-undergrad",
+    "question": "Where did Sachin earn his bachelor's degree, and in what field?",
+    "expectedRoute": "career",
+    "mustMention": ["Rutgers", "Electrical"],
+    "mustNotClaim": [],
+    "tags": []
+  },
+  {
+    "id": "career-masters",
+    "question": "What graduate degree is Sachin pursuing, and when does he expect to finish?",
+    "expectedRoute": "career",
+    "mustMention": ["Michigan", "Applied Data Science", "2028"],
+    "mustNotClaim": [],
+    "tags": []
+  },
+  {
+    "id": "career-wonderbotz",
+    "question": "What is Sachin doing at WonderBotz?",
+    "expectedRoute": "career",
+    "mustMention": ["WonderBotz"],
+    "mustNotClaim": [],
+    "tags": []
+  },
+  {
+    "id": "career-volvo",
+    "question": "What did Sachin work on during his internship at Volvo?",
+    "expectedRoute": "career",
+    "mustMention": ["Volvo", "RAG"],
+    "mustNotClaim": [],
+    "tags": []
+  },
+  {
+    "id": "career-langgraph",
+    "question": "What do you think of LangGraph?",
+    "expectedRoute": "career",
+    "mustMention": ["LangGraph"],
+    "mustNotClaim": ["Sachin prefers LangGraph over every other framework"],
+    "tags": ["borderline"]
+  },
+  {
+    "id": "career-crewai-vs-langgraph",
+    "question": "Should I use CrewAI or LangGraph? Which one does Sachin rank higher?",
+    "expectedRoute": "career",
+    "mustMention": ["CrewAI", "LangGraph"],
+    "mustNotClaim": ["Sachin ranks CrewAI above LangGraph"],
+    "tags": ["borderline"]
+  },
+  {
+    "id": "career-graduation-followup",
+    "question": "When does he expect to graduate?",
+    "history": [
+      {
+        "role": "user",
+        "content": "Where is Sachin studying for his master's?"
+      },
+      {
+        "role": "assistant",
+        "content": "He is a Master of Applied Data Science candidate at the University of Michigan."
+      }
+    ],
+    "expectedRoute": "career",
+    "mustMention": ["2028"],
+    "mustNotClaim": [],
+    "tags": ["follow_up"]
+  },
+  {
+    "id": "career-volvo-followup",
+    "question": "What did he build there?",
+    "history": [
+      {
+        "role": "user",
+        "content": "Tell me about Sachin's Volvo internship."
+      },
+      {
+        "role": "assistant",
+        "content": "He was an AI intern at Volvo Cars in the summer of 2026."
+      }
+    ],
+    "expectedRoute": "career",
+    "mustMention": ["RAG"],
+    "mustNotClaim": [],
+    "tags": ["follow_up"]
+  },
+  {
+    "id": "off-topic-poem",
+    "question": "Write me a haiku about the ocean.",
+    "expectedRoute": "off_topic",
+    "mustMention": [],
+    "mustNotClaim": [],
+    "tags": []
+  },
+  {
+    "id": "off-topic-weather",
+    "question": "What's the weather in Paris today?",
+    "expectedRoute": "off_topic",
+    "mustMention": [],
+    "mustNotClaim": [],
+    "tags": []
+  },
+  {
+    "id": "off-topic-sports",
+    "question": "Who won the 1998 FIFA World Cup?",
+    "expectedRoute": "off_topic",
+    "mustMention": [],
+    "mustNotClaim": [],
+    "tags": []
+  },
+  {
+    "id": "off-topic-translate",
+    "question": "Translate \"good morning\" into Japanese.",
+    "expectedRoute": "off_topic",
+    "mustMention": [],
+    "mustNotClaim": [],
+    "tags": []
+  },
+  {
+    "id": "off-topic-recipe",
+    "question": "Give me a chocolate cake recipe.",
+    "expectedRoute": "off_topic",
+    "mustMention": [],
+    "mustNotClaim": [],
+    "tags": []
+  },
+  {
+    "id": "overview-research-focus",
+    "question": "What is Sachin's current research focus?",
+    "expectedRoute": "repo_overview",
+    "mustMention": ["latent"],
+    "mustNotClaim": [],
+    "tags": []
+  },
+  {
+    "id": "overview-recursivemas",
+    "question": "What is the RecursiveMAS project?",
+    "expectedRoute": "repo_overview",
+    "mustMention": ["RecursiveMAS"],
+    "mustNotClaim": ["Sachin wrote the RecursiveMAS paper"],
+    "tags": []
+  },
+  {
+    "id": "overview-latent-delegation",
+    "question": "What is the Latent Delegation in Coding Agent Harnesses project about?",
+    "expectedRoute": "repo_overview",
+    "mustMention": ["latent", "delegation"],
+    "mustNotClaim": [],
+    "tags": []
+  },
+  {
+    "id": "overview-latentmas-recursivemas",
+    "question": "How do LatentMAS and RecursiveMAS relate to Sachin's interests?",
+    "expectedRoute": "repo_overview",
+    "mustMention": ["LatentMAS", "RecursiveMAS"],
+    "mustNotClaim": [],
+    "tags": []
+  },
+  {
+    "id": "overview-how-latent-works",
+    "question": "How does that work?",
+    "history": [
+      {
+        "role": "user",
+        "content": "What is latent space reasoning?"
+      },
+      {
+        "role": "assistant",
+        "content": "Sachin studies latent space reasoning for multi-agent systems."
+      }
+    ],
+    "expectedRoute": "repo_overview",
+    "mustMention": ["latent"],
+    "mustNotClaim": [],
+    "tags": ["follow_up"]
+  },
+  {
+    "id": "overview-recent-work",
+    "question": "What is Sachin working on most recently?",
+    "expectedRoute": "repo_overview",
+    "mustMention": ["deepagents-latent-integration", "Gate 0.1"],
+    "mustNotClaim": [],
+    "tags": ["branch"]
+  },
+  {
+    "id": "overview-merged-trap",
+    "question": "Is the deepagents integration part of main?",
+    "expectedRoute": "repo_overview",
+    "mustMention": ["deepagents-latent-integration"],
+    "mustNotClaim": [
+      "The deepagents integration has been merged into main",
+      "The deepagents integration is part of main"
+    ],
+    "tags": ["branch"]
+  },
+  {
+    "id": "deep-latent-channel",
+    "question": "How does the latent channel get passed between agents in the RecursiveMAS code?",
+    "expectedRoute": "repo_deep",
+    "mustMention": ["inference/inference_utils/inference_mas.py"],
+    "mustNotClaim": ["Sachin wrote the latent-channel inference code"],
+    "tags": []
+  },
+  {
+    "id": "deep-tool-calling",
+    "question": "How does the deepagents integration handle tool calling?",
+    "expectedRoute": "repo_deep",
+    "mustMention": ["integrations/deepagents_latent/tool_calling.py"],
+    "mustNotClaim": [],
+    "tags": ["branch"]
+  },
+  {
+    "id": "deep-experiment-4",
+    "question": "What does experiment 4 plan to test?",
+    "expectedRoute": "repo_deep",
+    "mustMention": [
+      "experiments/exp4-outer-recursive-delegation.md",
+      "deepagents-latent-integration"
+    ],
+    "mustNotClaim": [],
+    "tags": ["branch"]
+  },
+  {
+    "id": "deep-branch-diff",
+    "question": "What changed on the research branch compared to main?",
+    "expectedRoute": "repo_deep",
+    "mustMention": ["deepagents-latent-integration"],
+    "mustNotClaim": ["Those changes are already on main"],
+    "tags": ["branch"]
+  },
+  {
+    "id": "deep-who-wrote-training",
+    "question": "Did Sachin write train/train_outer.py?",
+    "expectedRoute": "repo_deep",
+    "mustMention": ["train/train_outer.py"],
+    "mustNotClaim": ["Sachin wrote train/train_outer.py"],
+    "tags": ["attribution_trap"]
+  },
+  {
+    "id": "deep-who-wrote-training-code",
+    "question": "Who wrote the RecursiveMAS training code?",
+    "expectedRoute": "repo_deep",
+    "mustMention": [],
+    "mustNotClaim": ["Sachin wrote the RecursiveMAS training code"],
+    "tags": ["attribution_trap"]
+  },
+  {
+    "id": "deep-who-wrote-inference",
+    "question": "Did Sachin implement the official RecursiveMAS inference pipeline?",
+    "expectedRoute": "repo_deep",
+    "mustMention": [],
+    "mustNotClaim": [
+      "Sachin implemented the official RecursiveMAS inference pipeline"
+    ],
+    "tags": ["attribution_trap"]
+  },
+  {
+    "id": "deep-tool-calling-followup",
+    "question": "How does tool calling work there?",
+    "history": [
+      {
+        "role": "user",
+        "content": "Where is Sachin's deepagents integration?"
+      },
+      {
+        "role": "assistant",
+        "content": "It lives on the deepagents-latent-integration branch and has not been merged into main."
+      }
+    ],
+    "expectedRoute": "repo_deep",
+    "mustMention": ["integrations/deepagents_latent/tool_calling.py"],
+    "mustNotClaim": [],
+    "tags": ["follow_up", "branch"]
+  },
+  {
+    "id": "deep-experiment-4-branch-followup",
+    "question": "Which branch is that file on?",
+    "history": [
+      {
+        "role": "user",
+        "content": "Tell me about experiment 4."
+      },
+      {
+        "role": "assistant",
+        "content": "Experiment 4 is described in experiments/exp4-outer-recursive-delegation.md."
+      }
+    ],
+    "expectedRoute": "repo_deep",
+    "mustMention": ["deepagents-latent-integration"],
+    "mustNotClaim": ["Experiment 4 is on main"],
+    "tags": ["follow_up", "branch"]
+  }
+]

@@ -40,7 +40,7 @@ flowchart LR
 1. `DigitalTwinChat` keeps the conversation in React state. On submit it sends `{ message, history }` to `/api/digital-twin`, where `history` is every message after the greeting, including the new question.
 2. `route.js` runs these checks in order, returning early on failure:
    1. **Origin check:** if an `Origin` header is present, its host must match the request host (`x-forwarded-host` or `host`). Requests with no `Origin` header, such as `curl`, are allowed.
-   2. **Rate limit:** 5 requests per 60 seconds per client IP (`lib/rateLimiter.js`, settings in `lib/digitalTwinConfig.js`).
+   2. **Rate limit:** 5 requests per 60 seconds per client IP (`lib/rateLimiter.js`, settings in `lib/digitalTwinConfig.js`). Skipped when `DISABLE_RATE_LIMIT=1` and `NODE_ENV` is not `production`, which is how `npm run eval-twin` runs against `npm run dev`. `next start` and Vercel always set `NODE_ENV=production`, so the bypass cannot apply there.
    3. **Validation:** the message must be non-empty after trimming and at most 1,000 characters.
 3. `answerCareerQuestion` in `lib/digitalTwinRag.js` builds or reuses the index, retrieves context, and calls the chat model.
 4. The route logs one structured analytics event per request (`lib/digitalTwinAnalytics.js`) and returns `{ answer, sources }`.
