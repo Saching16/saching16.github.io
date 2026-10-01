@@ -4,6 +4,7 @@ export const PROJECTS = [
     description:
       "Researching latent-space inter-agent delegation in recursive coding frameworks, with ablations around success rate, latency, cost, and observability.",
     tags: ["RecursiveMAS", "LatentMAS"],
+    repo: "Saching16/RecursiveMAS-Coding-Agents",
   },
   {
     title: "Hybrid RAG Pipeline",

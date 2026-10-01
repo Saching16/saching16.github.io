@@ -39,10 +39,11 @@ The contact email `sachin.s.ganpule@gmail.com` appears in three places: `SiteHea
   title: "Hybrid RAG Pipeline",
   description: "One or two sentences on what was built and the outcome.",
   tags: ["RAG", "Azure AI Search"],
+  repo: "owner/repository",
 }
 ```
 
-`title` must be unique, and each `tags` entry must be unique within its project.
+`title` must be unique, and each `tags` entry must be unique within its project. `repo` is optional. When present, it must be `owner/name` and match an entry in `data/repos/config.js`.
 
 ## Resume
 
