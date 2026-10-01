@@ -42,6 +42,7 @@ Open [http://localhost:3000](http://localhost:3000). The page works without an A
 | `npm run build`       | Production build. Runs `sync-rag` first via `prebuild`.                                       |
 | `npm start`           | Serve the production build.                                                                   |
 | `npm run sync-rag`    | Extract text from `data/rag/` sources and regenerate `data/rag/sources.js`.                   |
+| `npm run sync-repos`  | Copy the research repos listed in `data/repos/config.js` into `data/repos/`.                  |
 | `npm run fetch-drive` | Download changed resume/LinkedIn PDFs from Google Drive (needs Google credentials in `.env`). |
 | `npm test`            | Run the Vitest suite in `tests/`.                                                             |
 | `npm run lint`        | Run ESLint.                                                                                   |
@@ -71,6 +72,7 @@ data/
   projects.js                 Featured projects
   readingArchive.js           Reading archive entries
   rag/                        Chatbot source files and generated sources.js (see data/rag/README.md)
+  repos/                      Research-repo list, manifest, and generated snapshots
 lib/
   digitalTwinRag.js           Chunking, embeddings, retrieval, and answer generation
   digitalTwinConfig.js        Message, history, and rate-limit settings
