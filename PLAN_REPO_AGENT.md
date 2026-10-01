@@ -181,7 +181,7 @@ Every later step is judged against the same set of questions, so this comes firs
      - Records the last commit date and how many commits the branch is ahead of and behind `main`.
      - Saves the commit log: date, author, subject, and body. For `main` this is the last 10 commits. For other branches it is up to 30 commits not on `main`. Sachin's commit messages are detailed (for example "Gate 0.1 GREEN on a RunPod RTX 4090; record two infra traps"), so they're one of the best sources for "what's the latest progress?"
      - Saves the list of files that differ from `main`, with lines added and removed, plus a unified diff for each, capped at 400 lines per file.
-  5. Scans every file on every branch for secrets. Any file named like `.env`, `*.pem`, or `*key*` fails the run. So does content matching common key formats (`sk-`, `ghp_`, `AKIA`, private key headers). Failing loudly is safer than quietly redacting.
+  5. Leaves secret-like filenames (`.env`, `.env.*`, `*.pem`, and names containing `key`) out of the snapshot and prints a warning. Tokens matching common key formats (`sk-`, `ghp_`, `AKIA`, `tvly-`, private key headers) inside a published file are replaced with `[redacted]`, and the path is printed. The raw secret is never written.
   6. Writes `data/repos/<slug>/snapshot.json`. To avoid storing each file once per branch, file contents are stored once, keyed by git's blob ID. Each branch lists its files by path, blob ID, and attribution. The file holds:
      - `defaultBranch` and the fetch time,
      - `branches`: for each branch, its commit ID, dates, ahead/behind counts, file list, commit log, and diff from `main`,
@@ -206,7 +206,7 @@ Every later step is judged against the same set of questions, so this comes firs
   - branch and file filtering,
   - all three attribution cases,
   - notebook stripping,
-  - the secret scan: a fake `sk-...` string on a non-default branch fails the run, and ordinary code passes,
+  - the secret scan: a fake `sk-...` string is rejected before it can be stored, a published file has that token replaced with `[redacted]`, and ordinary code passes,
   - blob deduplication,
   - a branch that disappears from the remote is removed from the snapshot.
 - `npm run build` succeeds.

@@ -1,0 +1,9 @@
+{
+  "recursivemas-coding-agents": {
+    "branches": {
+      "deepagents-latent-integration": "90e2fc9ec0cf8822bb6e96946db773288281b15a",
+      "main": "27c0e601e94030499a3476903038bb2dd51df461",
+      "smoke-test": "858fcd205d423bd80c1898abcd437a7f8c25dfce"
+    }
+  }
+}
