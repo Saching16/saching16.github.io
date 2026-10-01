@@ -67,6 +67,8 @@ Defined in `lib/digitalTwinConfig.js`:
 
 The rate limiter keys on the first address in `x-forwarded-for`, then `x-real-ip`, then `"unknown"`. Its state is in memory per serverless instance.
 
+Set `DISABLE_RATE_LIMIT=1` to skip the limit while running `npm run eval-twin` against `npm run dev`. The route ignores that variable when `NODE_ENV` is `production`, including `next start` and every Vercel deployment.
+
 ## Analytics logging
 
 Each request writes one JSON line to stdout with `console.info`, which appears in Vercel's function logs. Logging is skipped when `NODE_ENV` is `test`.

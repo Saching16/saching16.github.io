@@ -9,7 +9,7 @@ vi.mock("../lib/digitalTwinRag", () => ({
   answerCareerQuestion: vi.fn(),
 }));
 
-import { POST } from "../app/api/digital-twin/route";
+import { isRateLimitBypassed, POST } from "../app/api/digital-twin/route";
 import { answerCareerQuestion } from "../lib/digitalTwinRag";
 
 describe("POST /api/digital-twin", () => {
@@ -124,5 +124,86 @@ describe("POST /api/digital-twin", () => {
     expect(response.status).toBe(429);
     expect(response.headers.get("Retry-After")).toBeTruthy();
     expect(answerCareerQuestion).toHaveBeenCalledTimes(RATE_LIMIT_MAX_REQUESTS);
+  });
+
+  it("still rate limits in production when the eval bypass is set", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousBypass = process.env.DISABLE_RATE_LIMIT;
+    process.env.NODE_ENV = "production";
+    process.env.DISABLE_RATE_LIMIT = "1";
+    answerCareerQuestion.mockResolvedValue({
+      answer: "Sample answer",
+      sources: ["Resume"],
+    });
+
+    try {
+      expect(isRateLimitBypassed()).toBe(false);
+
+      let response;
+      for (let index = 0; index < RATE_LIMIT_MAX_REQUESTS + 1; index += 1) {
+        response = await POST(
+          new Request("http://localhost:3000/api/digital-twin", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              host: "localhost:3000",
+              "x-forwarded-for": "203.0.113.20",
+            },
+            body: JSON.stringify({ message: `Question ${index}` }),
+          }),
+        );
+      }
+
+      expect(response.status).toBe(429);
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      if (previousBypass === undefined) {
+        delete process.env.DISABLE_RATE_LIMIT;
+      } else {
+        process.env.DISABLE_RATE_LIMIT = previousBypass;
+      }
+    }
+  });
+
+  it("skips the rate limit outside production when the eval bypass is set", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousBypass = process.env.DISABLE_RATE_LIMIT;
+    process.env.NODE_ENV = "development";
+    process.env.DISABLE_RATE_LIMIT = "1";
+    answerCareerQuestion.mockResolvedValue({
+      answer: "Sample answer",
+      sources: ["Resume"],
+    });
+
+    try {
+      expect(isRateLimitBypassed()).toBe(true);
+
+      let response;
+      for (let index = 0; index < RATE_LIMIT_MAX_REQUESTS + 1; index += 1) {
+        response = await POST(
+          new Request("http://localhost:3000/api/digital-twin", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              host: "localhost:3000",
+              "x-forwarded-for": "203.0.113.30",
+            },
+            body: JSON.stringify({ message: `Question ${index}` }),
+          }),
+        );
+      }
+
+      expect(response.status).toBe(200);
+      expect(answerCareerQuestion).toHaveBeenCalledTimes(
+        RATE_LIMIT_MAX_REQUESTS + 1,
+      );
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      if (previousBypass === undefined) {
+        delete process.env.DISABLE_RATE_LIMIT;
+      } else {
+        process.env.DISABLE_RATE_LIMIT = previousBypass;
+      }
+    }
   });
 });

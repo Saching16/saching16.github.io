@@ -10,6 +10,13 @@ import { checkRateLimit, getRateLimitKey } from "../../../lib/rateLimiter";
 
 export const runtime = "nodejs";
 
+export function isRateLimitBypassed() {
+  return (
+    process.env.DISABLE_RATE_LIMIT === "1" &&
+    process.env.NODE_ENV !== "production"
+  );
+}
+
 if (!process.env.OPENAI_API_KEY) {
   console.warn("Digital Twin route started without OPENAI_API_KEY.");
 }
@@ -56,11 +63,13 @@ export async function POST(request) {
       );
     }
 
-    const rateLimit = checkRateLimit({
-      key: getRateLimitKey(request),
-      windowMs: RATE_LIMIT_WINDOW_MS,
-      maxRequests: RATE_LIMIT_MAX_REQUESTS,
-    });
+    const rateLimit = isRateLimitBypassed()
+      ? { allowed: true }
+      : checkRateLimit({
+          key: getRateLimitKey(request),
+          windowMs: RATE_LIMIT_WINDOW_MS,
+          maxRequests: RATE_LIMIT_MAX_REQUESTS,
+        });
     if (!rateLimit.allowed) {
       logDigitalTwinEvent({
         request,

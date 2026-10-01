@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval-twin": "node --env-file-if-exists=.env scripts/eval-twin.mjs"
   },
   "dependencies": {
     "next": "^16.2.2",
