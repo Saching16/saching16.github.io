@@ -51,13 +51,16 @@ The full contract is in [digital-twin-api.md](digital-twin-api.md).
 
 ### Source generation (build time)
 
-`scripts/sync-rag-sources.mjs` reads the files in `data/rag/`, extracts text from PDFs with `pdf-parse`, cleans whitespace and page markers, and writes `data/rag/sources.js` as an array of `{ label, content }` objects.
+`scripts/sync-rag-sources.mjs` reads the files in `data/rag/`, extracts text from PDFs with `pdf-parse`, cleans whitespace and page markers, and writes `data/rag/sources.js` as an array of `{ label, content }` objects. It also adds each `data/repos/<slug>/overview.md` when that file exists.
 
 | Label              | Preferred input         | Fallback       | Required |
 | ------------------ | ----------------------- | -------------- | -------- |
 | Resume             | `resume.pdf`            | `resume.txt`   | Yes      |
 | LinkedIn           | `linkedin.pdf`          | `linkedin.txt` | No       |
 | Research Interests | `research-interests.md` | none           | Yes      |
+| Project: RecursiveMAS-Coding-Agents | `data/repos/recursivemas-coding-agents/overview.md` | none | No |
+
+`npm run build-repo-overview` writes that overview with `gpt-4.1` from the committed repo snapshot. Long source files are clipped so the request fits the account token limit. The script skips the model call when every branch commit in the snapshot matches the commit list recorded in the existing overview.
 
 The script fails if a required source is empty. PDF parsing happens only here, never at request time, which keeps `pdf-parse` out of the serverless function.
 
@@ -73,9 +76,9 @@ The cache lasts as long as the warm instance. Each cold start re-embeds all sour
 
 ### Retrieval and generation (every request)
 
-1. Embed the question.
-2. Rank all chunks by cosine similarity and keep the top 6.
-3. Build the prompt: a system message restricting answers to the provided context, the last 8 valid history messages (with the current question removed if it's the last entry), and a final user message containing the question and the retrieved chunks labeled by source.
+1. Embed the question together with the last two history messages, so a follow-up such as "what did he build there?" is retrieved in context.
+2. Rank all chunks by cosine similarity and keep the top 8.
+3. Build the prompt: a system message restricting answers to the provided context, telling the model to credit upstream authors for upstream work and to name a branch instead of implying branch-only work is merged, the last 8 valid history messages (with the current question removed if it's the last entry), and a final user message containing the question and the retrieved chunks labeled by source.
 4. Call `gpt-4o-mini` with temperature 0.2.
 5. Return the answer and the unique source labels of the retrieved chunks.
 

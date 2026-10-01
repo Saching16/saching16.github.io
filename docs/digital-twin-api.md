@@ -1,6 +1,6 @@
 # Digital Twin API
 
-`POST /api/digital-twin` answers a question about Sachin using retrieved context from his resume, LinkedIn export, and research notes. Implemented in `app/api/digital-twin/route.js` on the Node.js runtime.
+`POST /api/digital-twin` answers a question about Sachin using retrieved context from his resume, LinkedIn export, research notes, and research-repo overviews. Implemented in `app/api/digital-twin/route.js` on the Node.js runtime.
 
 ## Request
 
