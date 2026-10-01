@@ -148,7 +148,7 @@ Every later step is judged against the same set of questions, so this comes firs
 
 - Add `data/repos/config.js` exporting `REPO_SOURCES`, with one entry:
   - `slug: "recursivemas-coding-agents"`, `owner: "Saching16"`, `name: "RecursiveMAS-Coding-Agents"`, `defaultBranch: "main"`
-  - `excludeBranches: ["cursor/*", "dependabot/*"]`. All other branches are included.
+  - `excludeBranches: ["cursor/**", "dependabot/**"]`. The double star is required because Dependabot branch names have more than one slash, such as `dependabot/npm/next`. All other branches are included.
   - `maxBranches: 10`. If there are more, the sync fails so you can decide which to exclude, instead of the snapshot quietly growing.
   - `upstream: "RecursiveMAS/RecursiveMAS"`, used in attribution text
   - `authorEmails`: the addresses Sachin commits with (`sachin.s.ganpule@gmail.com` and `155867995+Saching16@users.noreply.github.com`)
