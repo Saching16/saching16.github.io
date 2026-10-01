@@ -1,4 +1,8 @@
-import { chunkText, cosineSimilarity } from "../lib/digitalTwinRag";
+import {
+  chunkText,
+  cosineSimilarity,
+  DIGITAL_TWIN_SYSTEM_PROMPT,
+} from "../lib/digitalTwinRag";
 import { RAG_SOURCES } from "../data/rag/sources";
 
 describe("digitalTwinRag helpers", () => {
@@ -34,5 +38,25 @@ describe("digitalTwinRag helpers", () => {
     expect(sourcesByLabel.get("LinkedIn")).toContain("linkedin.com");
     expect(sourcesByLabel.get("Research Interests")).toContain("LatentMAS");
     expect(sourcesByLabel.get("Research Interests")).toContain("RecursiveMAS");
+    expect(sourcesByLabel.get("Project: RecursiveMAS-Coding-Agents")).toContain(
+      "deepagents-latent-integration",
+    );
+    expect(sourcesByLabel.get("Project: RecursiveMAS-Coding-Agents")).toContain(
+      "What Sachin's research adds",
+    );
+    expect(
+      sourcesByLabel.get("Project: RecursiveMAS-Coding-Agents"),
+    ).not.toContain("overview-commits");
+  });
+
+  it("keeps attribution and branch status in the system prompt", () => {
+    expect(DIGITAL_TWIN_SYSTEM_PROMPT).toContain("only the provided context");
+    expect(DIGITAL_TWIN_SYSTEM_PROMPT).toContain("do not fabricate details");
+    expect(DIGITAL_TWIN_SYSTEM_PROMPT).toContain(
+      "Credit upstream authors for upstream work",
+    );
+    expect(DIGITAL_TWIN_SYSTEM_PROMPT).toContain(
+      "do not imply it has been merged",
+    );
   });
 });

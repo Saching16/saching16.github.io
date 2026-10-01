@@ -8,7 +8,7 @@ This folder contains the source material used by the Digital Twin chatbot.
 - `linkedin.pdf`: LinkedIn "Save to PDF" export. Synced from Google Drive.
 - `research-interests.md`: editable notes about current research interests.
 - `drive-manifest.json`: generated record of which Drive files were last synced. Do not edit by hand.
-- `sources.js`: generated file consumed by `lib/digitalTwinRag.js`.
+- `sources.js`: generated file consumed by `lib/digitalTwinRag.js`. `npm run sync-rag` also adds each `data/repos/<slug>/overview.md` as a source labeled `Project: <repo name>`. Those overview files are written by `npm run build-repo-overview`.
 
 `linkedin.txt` is still read as a fallback if `linkedin.pdf` is missing.
 
