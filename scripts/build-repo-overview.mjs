@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import OpenAI from "openai";
-import { REPO_SOURCES } from "../data/repos/config.js";
+import { REPO_SOURCES } from "../data/repos/config.mjs";
 import {
   OVERVIEW_INSTRUCTIONS,
   buildOverviewMaterials,

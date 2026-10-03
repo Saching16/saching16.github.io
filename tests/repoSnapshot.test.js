@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REPO_SOURCES } from "../data/repos/config.js";
+import { REPO_SOURCES } from "../data/repos/config.mjs";
 import {
   assembleSnapshot,
   assertNoSecrets,

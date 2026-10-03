@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PDFParse } from "pdf-parse";
-import { REPO_SOURCES } from "../data/repos/config.js";
+import { REPO_SOURCES } from "../data/repos/config.mjs";
 import { overviewBody, projectSourceLabel } from "./lib/repoOverview.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
