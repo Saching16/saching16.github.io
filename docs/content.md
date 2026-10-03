@@ -43,7 +43,7 @@ The contact email `sachin.s.ganpule@gmail.com` appears in three places: `SiteHea
 }
 ```
 
-`title` must be unique, and each `tags` entry must be unique within its project. `repo` is optional. When present, it must be `owner/name` and match an entry in `data/repos/config.js`.
+`title` must be unique, and each `tags` entry must be unique within its project. `repo` is optional. When present, it must be `owner/name` and match an entry in `data/repos/config.mjs`.
 
 ## Resume
 

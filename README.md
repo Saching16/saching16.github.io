@@ -41,8 +41,9 @@ Open [http://localhost:3000](http://localhost:3000). The page works without an A
 | `npm run dev`         | Start the Next.js dev server.                                                                 |
 | `npm run build`       | Production build. Runs `sync-rag` first via `prebuild`.                                       |
 | `npm start`           | Serve the production build.                                                                   |
-| `npm run sync-rag`    | Extract text from `data/rag/` sources and regenerate `data/rag/sources.js`.                   |
-| `npm run sync-repos`  | Copy the research repos listed in `data/repos/config.js` into `data/repos/`.                  |
+| `npm run sync-rag`    | Extract text from `data/rag/` sources and regenerate `data/rag/sources.js`. Also adds each `data/repos/<slug>/overview.md`. |
+| `npm run sync-repos`  | Copy the research repos listed in `data/repos/config.mjs` into `data/repos/`.                  |
+| `npm run build-repo-overview` | Write `data/repos/<slug>/overview.md` with `gpt-4.1` when a snapshot branch commit changed. Needs `OPENAI_API_KEY`. |
 | `npm run fetch-drive` | Download changed resume/LinkedIn PDFs from Google Drive (needs Google credentials in `.env`). |
 | `npm test`            | Run the Vitest suite in `tests/`.                                                             |
 | `npm run lint`        | Run ESLint.                                                                                   |
@@ -53,7 +54,7 @@ See [`.env.example`](.env.example) for the full list.
 
 | Variable                      | Used by                                   | Required             |
 | ----------------------------- | ----------------------------------------- | -------------------- |
-| `OPENAI_API_KEY`              | Chat API route, change-summary script     | Yes, for the chatbot |
+| `OPENAI_API_KEY`              | Chat API route, change-summary script, `npm run build-repo-overview` | Yes, for the chatbot |
 | `CHAT_ANALYTICS_SALT`         | Hashing client IPs in chat analytics logs | No (has a default)   |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | `npm run fetch-drive`                     | Only for Drive sync  |
 | `GOOGLE_DRIVE_FOLDER_ID`      | `npm run fetch-drive`                     | Only for Drive sync  |

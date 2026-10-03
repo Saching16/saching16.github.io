@@ -7,6 +7,7 @@
     "prebuild": "npm run sync-rag",
     "sync-rag": "node scripts/sync-rag-sources.mjs",
     "sync-repos": "node scripts/sync-repo-snapshots.mjs",
+    "build-repo-overview": "node --env-file-if-exists=.env scripts/build-repo-overview.mjs",
     "fetch-drive": "node --env-file-if-exists=.env scripts/fetch-drive-sources.mjs",
     "build": "next build",
     "start": "next start",

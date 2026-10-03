@@ -13,7 +13,8 @@ npm install
 npm run dev        # dev server on http://localhost:3000
 npm test           # Vitest, tests/**/*.test.js
 npm run lint       # ESLint (next/core-web-vitals)
-npm run sync-rag   # regenerate data/rag/sources.js from data/rag/ source files
+npm run sync-rag   # regenerate data/rag/sources.js from data/rag/ source files and repo overviews
+npm run build-repo-overview # write data/repos/<slug>/overview.md when a snapshot branch changed
 npm run build      # runs sync-rag first via prebuild
 ```
 
@@ -32,7 +33,8 @@ Run `npm test` and `npm run lint` before finishing any change. There is no CI jo
 
 ## Generated and sensitive files
 
-- **`data/rag/sources.js` is generated.** Never edit it by hand. Change the inputs (`data/rag/resume.pdf`, `data/rag/linkedin.pdf`, `data/rag/research-interests.md`) and run `npm run sync-rag`. Note that `npm run build` also rewrites it.
+- **`data/rag/sources.js` is generated.** Never edit it by hand. Change the inputs (`data/rag/resume.pdf`, `data/rag/linkedin.pdf`, `data/rag/research-interests.md`, or a repo `overview.md`) and run `npm run sync-rag`. Note that `npm run build` also rewrites it.
+- **`data/repos/<slug>/snapshot.json`, `data/repos/manifest.json`, and `data/repos/<slug>/overview.md` are generated.** Don't edit them by hand. `npm run sync-repos` writes the snapshot and manifest. `npm run build-repo-overview` writes the overview, and only calls the model when a branch commit in the snapshot changed.
 - **`data/rag/drive-manifest.json`** (created by `npm run fetch-drive`) is generated. Don't edit it by hand.
 - **`data/rag/resume.pdf` and `public/resume.pdf` must stay identical.** The Drive sync writes both. If you replace one manually, replace the other.
 - The PDFs in the repo root (`AI Eng Resume, Master of DS -Sachin Ganpule  (6).pdf`, `LinkedInProfile.pdf`) are original uploads. Nothing reads them. Don't delete them without asking.

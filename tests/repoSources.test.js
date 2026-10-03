@@ -5,7 +5,7 @@ import {
   isRepoFileIncluded,
   REPO_SOURCES,
   repoFullName,
-} from "../data/repos/config";
+} from "../data/repos/config.mjs";
 
 describe("repo sources", () => {
   it("links every project repo to a source, and every source to a project", () => {

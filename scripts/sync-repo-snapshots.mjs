@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { REPO_SOURCES } from "../data/repos/config.js";
+import { REPO_SOURCES } from "../data/repos/config.mjs";
 import {
   assembleSnapshot,
   assertNoSecrets,

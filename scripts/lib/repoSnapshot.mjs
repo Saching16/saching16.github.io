@@ -1,7 +1,7 @@
 import {
   isBranchExcluded,
   isRepoFileIncluded,
-} from "../../data/repos/config.js";
+} from "../../data/repos/config.mjs";
 
 const SECRET_CONTENT = [
   ["OpenAI-style key", /sk-[A-Za-z0-9]{20,}/g],

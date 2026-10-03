@@ -1,3 +1,5 @@
+// This file is .mjs so Node loads it as ESM. `npm run build` imports it from
+// scripts, and a .js file is CommonJS unless the package is marked as a module.
 export const REPO_SOURCES = [
   {
     slug: "recursivemas-coding-agents",
