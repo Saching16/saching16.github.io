@@ -8,7 +8,7 @@ This folder contains the source material used by the Digital Twin chatbot.
 - `linkedin.pdf`: LinkedIn "Save to PDF" export. Synced from Google Drive.
 - `research-interests.md`: editable notes about current research interests.
 - `drive-manifest.json`: generated record of which Drive files were last synced. Do not edit by hand.
-- `sources.js`: generated file consumed by `lib/digitalTwinRag.js`. `npm run sync-rag` also adds each `data/repos/<slug>/overview.md` as a source labeled `Project: <repo name>`. Those overview files are written by `npm run build-repo-overview`.
+- `sources.js`: generated file consumed by `lib/digitalTwinRag.js`. `npm run sync-rag` also adds each `data/repos/<slug>/overview.md` as a source labeled `Project: <repo name>`. Those overview files are written by `npm run build-repo-overview`. See [data/repos/README.md](../repos/README.md).
 
 `linkedin.txt` is still read as a fallback if `linkedin.pdf` is missing.
 
@@ -21,14 +21,18 @@ Upload the new file to the shared Google Drive folder:
 
 If several files match, the most recently modified one wins.
 
-The weekly workflow in `.github/workflows/weekly-rag-refresh.yml` downloads changed files, regenerates `sources.js`, and opens a pull request summarizing what changed. Merge it to redeploy. See `PLAN.md` for architecture and one-time setup.
+The weekly workflow in `.github/workflows/weekly-rag-refresh.yml` downloads changed Drive files, refreshes the research-repo snapshots and overviews described in [data/repos/README.md](../repos/README.md), regenerates `sources.js`, and opens a pull request titled "Update chatbot sources". Merge it to redeploy. See `PLAN.md` for the Drive setup.
 
 To run the same steps locally, put `GOOGLE_SERVICE_ACCOUNT_JSON` and `GOOGLE_DRIVE_FOLDER_ID` in `.env`, then:
 
 ```bash
 npm run fetch-drive
+npm run sync-repos
+npm run build-repo-overview
 npm run sync-rag
 ```
+
+`npm run build-repo-overview` also needs `OPENAI_API_KEY` when a research-repo branch commit changed.
 
 ## Updating Manually
 

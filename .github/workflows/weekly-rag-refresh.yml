@@ -38,6 +38,17 @@ jobs:
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         run: npm run fetch-drive
 
+      - name: Sync research repo snapshots
+        run: npm run sync-repos
+
+      # One gpt-4.1 request per changed repo. The script clips long sources
+      # and waits 65 seconds before a validation retry so the call stays under
+      # the account limit of 30,000 tokens per minute.
+      - name: Build research repo overviews
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: npm run build-repo-overview
+
       - name: Regenerate RAG sources
         run: npm run sync-rag
 
@@ -49,8 +60,8 @@ jobs:
       - name: Open pull request if sources changed
         uses: peter-evans/create-pull-request@v7
         with:
-          commit-message: "Update RAG sources from Google Drive"
-          title: "Update chatbot sources from Google Drive"
+          commit-message: "Update chatbot sources"
+          title: "Update chatbot sources"
           body-path: ${{ runner.temp }}/pr-body.md
           branch: weekly-rag-refresh
           delete-branch: true
