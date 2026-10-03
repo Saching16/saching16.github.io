@@ -58,7 +58,7 @@ Run `npm test` and `npm run lint` before finishing any change. There is no CI jo
 
 ## Weekly RAG refresh
 
-`.github/workflows/weekly-rag-refresh.yml` runs `fetch-drive`, `sync-rag`, and `summarize-rag-changes.mjs`, then opens a pull request on the `weekly-rag-refresh` branch. The summary script diffs against `git show HEAD:...`, so the workflow must not commit before the pull request step. Design details are in [PLAN.md](PLAN.md). Pull requests from this workflow are never auto-merged, and that should stay the case.
+`.github/workflows/weekly-rag-refresh.yml` runs `fetch-drive`, `sync-repos`, `build-repo-overview`, `sync-rag`, and `summarize-rag-changes.mjs`, then opens a pull request titled "Update chatbot sources" on the `weekly-rag-refresh` branch. The summary script diffs against `git show HEAD:...`, so the workflow must not commit before the pull request step. `build-repo-overview` calls `gpt-4.1` only when a snapshot branch commit changed, and that call stays under the account limit of 30,000 tokens per minute. Design details are in [PLAN.md](PLAN.md) and [PLAN_REPO_AGENT.md](PLAN_REPO_AGENT.md). Pull requests from this workflow are never auto-merged, and that should stay the case.
 
 ## Documentation
 

@@ -1,4 +1,5 @@
 import { DRIVE_SOURCES } from "./driveSources.mjs";
+import { formatRepoChanges } from "./repoChanges.mjs";
 
 const MIN_SOURCE_LENGTH = 500;
 const MAX_SHRINK_RATIO = 0.4;
@@ -97,11 +98,12 @@ export function buildPrBody({
   summaries,
   aiNote,
   warnings,
+  repoChanges = [],
 }) {
   const lines = [
     "## Summary",
     "",
-    "Automated refresh of the Digital Twin chatbot's sources from Google Drive.",
+    "Automated refresh of the Digital Twin chatbot's sources from Google Drive and the research repos listed in `data/repos/config.mjs`.",
     "",
     "### Drive files picked up",
     "",
@@ -119,9 +121,7 @@ export function buildPrBody({
 
   lines.push("", "### What changed", "");
   if (!sourceChanges.length) {
-    lines.push(
-      "The extracted text is unchanged. The file was re-saved in Drive without content changes.",
-    );
+    lines.push("The extracted text is unchanged.");
   }
   for (const change of sourceChanges) {
     lines.push(
@@ -134,7 +134,8 @@ export function buildPrBody({
     lines.push(summary || `_AI summary unavailable: ${aiNote}_`, "");
   }
 
-  lines.push("", "### Sanity checks", "");
+  lines.push("", "### Repo changes", "", ...formatRepoChanges(repoChanges), "");
+  lines.push("### Sanity checks", "");
   if (warnings.length) {
     lines.push(...warnings.map((warning) => `- **Warning:** ${warning}`));
   } else {
