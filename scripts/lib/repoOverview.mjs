@@ -261,16 +261,9 @@ function citedPaths(section, snapshot) {
   const unique = [...new Set(paths)].sort(
     (left, right) => right.length - left.length,
   );
-  let remaining = section;
-  const cited = [];
-  for (const filePath of unique) {
-    if (!remaining.includes(filePath)) {
-      continue;
-    }
-    cited.push(filePath);
-    remaining = remaining.split(filePath).join("");
-  }
-  return cited;
+  return unique.filter(
+    (filePath) => standaloneIndexes(section, filePath).length > 0,
+  );
 }
 
 export function presenceClaimErrors(markdown, snapshot) {
@@ -386,6 +379,49 @@ export function upstreamPathsCitedAsSachin(section, snapshot) {
   return citedPaths(section, snapshot).filter(
     (filePath) => !sachinPaths.has(filePath),
   );
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
+}
+
+function removeSentence(markdown, sentence) {
+  const pattern = sentence.split(/\s+/).map(escapeRegExp).join("\\s+");
+  return markdown.replace(new RegExp(pattern), "");
+}
+
+export function dropInvalidOverviewSentences(markdown, snapshot) {
+  const nonDefault = Object.keys(snapshot.branches).filter(
+    (name) => name !== snapshot.defaultBranch,
+  );
+  const sachin = overviewSection(
+    markdown,
+    "What Sachin's research adds",
+  ).replace(/\s+/g, " ");
+  const removed = [];
+  let body = markdown;
+
+  for (const sentence of sentencesOf(markdown)) {
+    const reasons = [
+      ...allBranchPathErrors(sentence, snapshot),
+      ...presenceClaimErrors(sentence, snapshot),
+      ...mergedBranchClaims(sentence, nonDefault),
+    ];
+    if (sachin.includes(sentence)) {
+      reasons.push(...upstreamPathsCitedAsSachin(sentence, snapshot));
+    }
+    if (reasons.length === 0) {
+      continue;
+    }
+    const next = removeSentence(body, sentence);
+    if (next === body) {
+      continue;
+    }
+    body = next;
+    removed.push(sentence);
+  }
+
+  return { markdown: body, removed };
 }
 
 export function paperUrl(snapshot) {

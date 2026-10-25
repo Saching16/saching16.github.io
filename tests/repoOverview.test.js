@@ -8,6 +8,7 @@ import {
   allBranchPathErrors,
   presenceClaimErrors,
   claimsMerged,
+  dropInvalidOverviewSentences,
   mergedBranchClaims,
   leadingPythonNote,
   newestCopy,
@@ -121,6 +122,37 @@ describe("repo overview", () => {
         snapshot,
       ),
     ).toEqual(["train/train_outer.py"]);
+    expect(
+      upstreamPathsCitedAsSachin("He added pkg/__init__.py.", {
+        defaultBranch: "main",
+        branches: {
+          main: {
+            files: [
+              { path: "pkg/__init__.py", attribution: "sachin" },
+              { path: "__init__.py", attribution: "upstream" },
+            ],
+          },
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it("drops a sentence that puts one branch's file on all branches", async () => {
+    const overview = await readFile(
+      new URL(
+        "../data/repos/recursivemas-coding-agents/overview.md",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const broken = overview.replace(
+      "## Repo layout",
+      "PLAN.md is on all branches.\n\n## Repo layout",
+    );
+    expect(validateOverview(broken, snapshot).join(" ")).toContain("PLAN.md");
+    const dropped = dropInvalidOverviewSentences(broken, snapshot);
+    expect(dropped.removed.join(" ")).toContain("PLAN.md is on all branches");
+    expect(validateOverview(dropped.markdown, snapshot)).toEqual([]);
   });
 
   it("prepares materials without secret-shaped tokens", () => {

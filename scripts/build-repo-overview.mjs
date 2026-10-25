@@ -7,6 +7,7 @@ import { REPO_SOURCES } from "../data/repos/config.mjs";
 import {
   OVERVIEW_INSTRUCTIONS,
   buildOverviewMaterials,
+  dropInvalidOverviewSentences,
   overviewIsCurrent,
   stampOverview,
   stripModelFences,
@@ -49,6 +50,19 @@ async function draftOverview(client, snapshot) {
     }
 
     lastErrors = validateOverview(body, snapshot);
+    if (lastErrors.length > 0) {
+      const salvaged = dropInvalidOverviewSentences(body, snapshot);
+      const salvagedErrors = validateOverview(salvaged.markdown, snapshot);
+      if (salvaged.removed.length > 0 && salvagedErrors.length === 0) {
+        console.warn(
+          `Dropped ${salvaged.removed.length} sentence(s) that failed overview checks.`,
+        );
+        for (const sentence of salvaged.removed) {
+          console.warn(`Dropped: ${sentence}`);
+        }
+        return stampOverview(salvaged.markdown, snapshot);
+      }
+    }
     if (lastErrors.length === 0) {
       return stampOverview(body, snapshot);
     }
