@@ -53,6 +53,11 @@ async function draftOverview(client, snapshot) {
       return stampOverview(body, snapshot);
     }
 
+    console.error(
+      `Overview draft ${attempt} failed checks:\n${lastErrors
+        .map((error) => `- ${error}`)
+        .join("\n")}`,
+    );
     feedback = `\n\nYour previous draft failed these checks:\n${lastErrors
       .map((error) => `- ${error}`)
       .join("\n")}\nRewrite the full overview with the six required headings.`;

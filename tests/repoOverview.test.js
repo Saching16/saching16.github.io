@@ -91,6 +91,18 @@ describe("repo overview", () => {
       ).join(" "),
     ).toContain("deepagents-latent-integration");
     expect(
+      allBranchPathErrors(
+        "`notebooks/latent_channel_smoke.ipynb` is on all branches, while `latent_channel_smoke.ipynb` is only on smoke-test.",
+        snapshot,
+      ),
+    ).toEqual([]);
+    expect(
+      allBranchPathErrors(
+        "`latent_channel_smoke.ipynb` is on all branches.",
+        snapshot,
+      ).join(" "),
+    ).toContain("deepagents-latent-integration");
+    expect(
       presenceClaimErrors(
         "notebooks/latent_channel_smoke.ipynb is not present on deepagents-latent-integration.",
         snapshot,
@@ -117,6 +129,10 @@ describe("repo overview", () => {
       "PROPOSAL.md from deepagents-latent-integration (attribution: sachin",
     );
     expect(text).toContain("Gate 0.1 GREEN");
+    expect(text).toContain(
+      "notebooks/latent_channel_smoke.ipynb is on deepagents-latent-integration, main, smoke-test",
+    );
+    expect(text).toContain("latent_channel_smoke.ipynb is on smoke-test");
     expect(text).toContain("not merged");
     expect(text.length).toBeLessThanOrEqual(OVERVIEW_MATERIAL_CHAR_LIMIT);
     expect(findSecret("overview-prompt.txt", text)).toBeNull();
