@@ -51,16 +51,22 @@ async function draftOverview(client, snapshot) {
 
     lastErrors = validateOverview(body, snapshot);
     if (lastErrors.length > 0) {
-      const salvaged = dropInvalidOverviewSentences(body, snapshot);
-      const salvagedErrors = validateOverview(salvaged.markdown, snapshot);
-      if (salvaged.removed.length > 0 && salvagedErrors.length === 0) {
-        console.warn(
-          `Dropped ${salvaged.removed.length} sentence(s) that failed overview checks.`,
-        );
-        for (const sentence of salvaged.removed) {
-          console.warn(`Dropped: ${sentence}`);
+      try {
+        const salvaged = dropInvalidOverviewSentences(body, snapshot);
+        const salvagedErrors = validateOverview(salvaged.markdown, snapshot);
+        if (salvaged.removed.length > 0 && salvagedErrors.length === 0) {
+          console.warn(
+            `Dropped ${salvaged.removed.length} sentence(s) that failed overview checks.`,
+          );
+          for (const sentence of salvaged.removed) {
+            console.warn(`Dropped: ${sentence}`);
+          }
+          return stampOverview(salvaged.markdown, snapshot);
         }
-        return stampOverview(salvaged.markdown, snapshot);
+      } catch (error) {
+        console.error(
+          `Could not drop invalid sentences: ${error.message}`,
+        );
       }
     }
     if (lastErrors.length === 0) {

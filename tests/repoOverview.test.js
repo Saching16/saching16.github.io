@@ -153,6 +153,12 @@ describe("repo overview", () => {
     const dropped = dropInvalidOverviewSentences(broken, snapshot);
     expect(dropped.removed.join(" ")).toContain("PLAN.md is on all branches");
     expect(validateOverview(dropped.markdown, snapshot)).toEqual([]);
+    expect(() =>
+      dropInvalidOverviewSentences(
+        "- **notebooks/**: Contains `latent_channel_smoke.ipynb` for latent channel diagnostics; present on all branches.",
+        snapshot,
+      ),
+    ).not.toThrow();
   });
 
   it("prepares materials without secret-shaped tokens", () => {

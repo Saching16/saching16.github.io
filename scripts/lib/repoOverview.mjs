@@ -382,7 +382,7 @@ export function upstreamPathsCitedAsSachin(section, snapshot) {
 }
 
 function escapeRegExp(value) {
-  return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function removeSentence(markdown, sentence) {
