@@ -20,7 +20,7 @@ Rules:
 - "Current work" is the most recently committed branch. State its name, its last commit date as YYYY-MM-DD, and what its newest commit subjects say. Do not describe that work as merged.
 - "Branches" has one short paragraph per branch. Cover its purpose, its last commit date as YYYY-MM-DD, what it adds compared with the default branch, and whether it has been merged. For every branch that is not the default branch, include the words "not merged". You may say the default branch contains an upstream merge commit. Do not say any other branch has been merged.
 - "Repo layout" says what each top-level folder does, and notes folders that exist only on a branch.
-- "Key entry points" names which files to read for training, inference, evaluation, and the deepagents integration, and states the branch for each. Label upstream entry points as upstream. Say a path is on all branches only when that exact path is in every branch's file tree. Do not say a path is absent from a branch when that path is in the branch file tree. If a file exists on the default branch and is also in another branch's diff, that branch revises it. A file that is missing from the default branch is new on the other branch, not an extension of a default-branch file.
+- "Key entry points" names which files to read for training, inference, evaluation, and the deepagents integration, and states the branch for each. Label upstream entry points as upstream. Say a path is on all branches only when that exact path is in every branch's file tree. Two files can share a filename; use the full path, and do not treat the shorter path as the longer one. Do not say a path is absent from a branch when that path is in the branch file tree. If a file exists on the default branch and is also in another branch's diff, that branch revises it. A file that is missing from the default branch is new on the other branch, not an extension of a default-branch file.
 - Be specific and concise. Do not paste the source documents.`;
 
 const PLAN_PATH = /^(?:PROPOSAL\.md|PLAN\.md|experiments\/exp[^/]+\.md)$/;
@@ -261,16 +261,9 @@ function citedPaths(section, snapshot) {
   const unique = [...new Set(paths)].sort(
     (left, right) => right.length - left.length,
   );
-  let remaining = section;
-  const cited = [];
-  for (const filePath of unique) {
-    if (!remaining.includes(filePath)) {
-      continue;
-    }
-    cited.push(filePath);
-    remaining = remaining.split(filePath).join("");
-  }
-  return cited;
+  return unique.filter(
+    (filePath) => standaloneIndexes(section, filePath).length > 0,
+  );
 }
 
 export function presenceClaimErrors(markdown, snapshot) {
@@ -310,6 +303,42 @@ export function presenceClaimErrors(markdown, snapshot) {
   return errors;
 }
 
+function standaloneIndexes(sentence, filePath) {
+  const indexes = [];
+  let from = 0;
+  while (from < sentence.length) {
+    const index = sentence.indexOf(filePath, from);
+    if (index < 0) {
+      break;
+    }
+    if (index === 0 || sentence[index - 1] !== "/") {
+      indexes.push(index);
+    }
+    from = index + filePath.length;
+  }
+  return indexes;
+}
+
+const ALL_BRANCH_CONTRAST =
+  /\b(while|whereas|unlike|except|only|but|however)\b|n't\b|\bnot\b/i;
+
+function pathClaimedOnAllBranches(sentence, filePath) {
+  const phrase = sentence.search(/all branches/i);
+  if (phrase < 0) {
+    return false;
+  }
+
+  const phraseEnd = phrase + "all branches".length;
+  return standaloneIndexes(sentence, filePath).some((index) => {
+    const pathEnd = index + filePath.length;
+    const between = sentence.slice(
+      Math.min(pathEnd, phraseEnd),
+      Math.max(index, phrase),
+    );
+    return !ALL_BRANCH_CONTRAST.test(between);
+  });
+}
+
 export function allBranchPathErrors(markdown, snapshot) {
   const names = Object.keys(snapshot.branches);
   const errors = [];
@@ -319,6 +348,9 @@ export function allBranchPathErrors(markdown, snapshot) {
       continue;
     }
     for (const filePath of citedPaths(sentence, snapshot)) {
+      if (!pathClaimedOnAllBranches(sentence, filePath)) {
+        continue;
+      }
       const missing = names.filter(
         (name) =>
           !snapshot.branches[name].files.some((file) => file.path === filePath),
@@ -347,6 +379,49 @@ export function upstreamPathsCitedAsSachin(section, snapshot) {
   return citedPaths(section, snapshot).filter(
     (filePath) => !sachinPaths.has(filePath),
   );
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function removeSentence(markdown, sentence) {
+  const pattern = sentence.split(/\s+/).map(escapeRegExp).join("\\s+");
+  return markdown.replace(new RegExp(pattern), "");
+}
+
+export function dropInvalidOverviewSentences(markdown, snapshot) {
+  const nonDefault = Object.keys(snapshot.branches).filter(
+    (name) => name !== snapshot.defaultBranch,
+  );
+  const sachin = overviewSection(
+    markdown,
+    "What Sachin's research adds",
+  ).replace(/\s+/g, " ");
+  const removed = [];
+  let body = markdown;
+
+  for (const sentence of sentencesOf(markdown)) {
+    const reasons = [
+      ...allBranchPathErrors(sentence, snapshot),
+      ...presenceClaimErrors(sentence, snapshot),
+      ...mergedBranchClaims(sentence, nonDefault),
+    ];
+    if (sachin.includes(sentence)) {
+      reasons.push(...upstreamPathsCitedAsSachin(sentence, snapshot));
+    }
+    if (reasons.length === 0) {
+      continue;
+    }
+    const next = removeSentence(body, sentence);
+    if (next === body) {
+      continue;
+    }
+    body = next;
+    removed.push(sentence);
+  }
+
+  return { markdown: body, removed };
 }
 
 export function paperUrl(snapshot) {
@@ -491,6 +566,38 @@ function clipWithHeadings(text, limit) {
     .join("\n")}`;
 }
 
+function sharedFilenameNotes(snapshot) {
+  const byBase = new Map();
+  for (const [name, branch] of Object.entries(snapshot.branches)) {
+    for (const file of branch.files) {
+      const base = file.path.split("/").pop();
+      if (!byBase.has(base)) {
+        byBase.set(base, new Map());
+      }
+      const paths = byBase.get(base);
+      if (!paths.has(file.path)) {
+        paths.set(file.path, []);
+      }
+      paths.get(file.path).push(name);
+    }
+  }
+
+  const notes = [];
+  for (const [base, paths] of byBase) {
+    if (paths.size < 2) {
+      continue;
+    }
+    const parts = [...paths.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(
+        ([filePath, branches]) =>
+          `${filePath} is on ${[...branches].sort().join(", ")}`,
+      );
+    notes.push(`- ${base} names more than one file. ${parts.join(". ")}.`);
+  }
+  return notes.length > 0 ? notes : ["- None"];
+}
+
 export function buildOverviewMaterials(snapshot) {
   const redactions = [];
 
@@ -591,6 +698,12 @@ export function buildOverviewMaterials(snapshot) {
       lines.push(`- ${entry.path} (+${additions} -${deletions})`);
     }
   }
+
+  lines.push("", "# Files that share a filename");
+  lines.push(
+    "These full paths are different files. Say a path is on all branches only for the full path that appears on every branch.",
+  );
+  lines.push(...sharedFilenameNotes(snapshot));
 
   lines.push("", "# Top-level folders");
   const defaultFolders = new Set(topLevelFolders(defaultBranch));

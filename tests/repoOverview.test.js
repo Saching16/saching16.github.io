@@ -8,6 +8,7 @@ import {
   allBranchPathErrors,
   presenceClaimErrors,
   claimsMerged,
+  dropInvalidOverviewSentences,
   mergedBranchClaims,
   leadingPythonNote,
   newestCopy,
@@ -91,6 +92,18 @@ describe("repo overview", () => {
       ).join(" "),
     ).toContain("deepagents-latent-integration");
     expect(
+      allBranchPathErrors(
+        "`notebooks/latent_channel_smoke.ipynb` is on all branches, while `latent_channel_smoke.ipynb` is only on smoke-test.",
+        snapshot,
+      ),
+    ).toEqual([]);
+    expect(
+      allBranchPathErrors(
+        "`latent_channel_smoke.ipynb` is on all branches.",
+        snapshot,
+      ).join(" "),
+    ).toContain("deepagents-latent-integration");
+    expect(
       presenceClaimErrors(
         "notebooks/latent_channel_smoke.ipynb is not present on deepagents-latent-integration.",
         snapshot,
@@ -109,6 +122,43 @@ describe("repo overview", () => {
         snapshot,
       ),
     ).toEqual(["train/train_outer.py"]);
+    expect(
+      upstreamPathsCitedAsSachin("He added pkg/__init__.py.", {
+        defaultBranch: "main",
+        branches: {
+          main: {
+            files: [
+              { path: "pkg/__init__.py", attribution: "sachin" },
+              { path: "__init__.py", attribution: "upstream" },
+            ],
+          },
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it("drops a sentence that puts one branch's file on all branches", async () => {
+    const overview = await readFile(
+      new URL(
+        "../data/repos/recursivemas-coding-agents/overview.md",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const broken = overview.replace(
+      "## Repo layout",
+      "PLAN.md is on all branches.\n\n## Repo layout",
+    );
+    expect(validateOverview(broken, snapshot).join(" ")).toContain("PLAN.md");
+    const dropped = dropInvalidOverviewSentences(broken, snapshot);
+    expect(dropped.removed.join(" ")).toContain("PLAN.md is on all branches");
+    expect(validateOverview(dropped.markdown, snapshot)).toEqual([]);
+    expect(() =>
+      dropInvalidOverviewSentences(
+        "- **notebooks/**: Contains `latent_channel_smoke.ipynb` for latent channel diagnostics; present on all branches.",
+        snapshot,
+      ),
+    ).not.toThrow();
   });
 
   it("prepares materials without secret-shaped tokens", () => {
@@ -117,6 +167,10 @@ describe("repo overview", () => {
       "PROPOSAL.md from deepagents-latent-integration (attribution: sachin",
     );
     expect(text).toContain("Gate 0.1 GREEN");
+    expect(text).toContain(
+      "notebooks/latent_channel_smoke.ipynb is on deepagents-latent-integration, main, smoke-test",
+    );
+    expect(text).toContain("latent_channel_smoke.ipynb is on smoke-test");
     expect(text).toContain("not merged");
     expect(text.length).toBeLessThanOrEqual(OVERVIEW_MATERIAL_CHAR_LIMIT);
     expect(findSecret("overview-prompt.txt", text)).toBeNull();

@@ -25,23 +25,23 @@ flowchart TD
   end
 
   subgraph Job[GitHub Actions: weekly-rag-refresh]
-    D[fetch-drive-sources: list Drive folder, compare with manifest]
-    E{Any file newer than the manifest?}
-    F[Download PDFs into data/rag and public]
+    D[fetch-drive: download PDFs that differ from the manifest]
+    R[sync-repos: copy public research repos]
+    O[build-repo-overview: rewrite overview.md when a branch commit changed]
     G[sync-rag: extract text into sources.js]
-    H[summarize-rag-changes: diff old vs new text, AI summary, sanity checks]
-    I[Open or update pull request]
+    H[summarize-rag-changes: text summary, repo changes, sanity checks]
+    I[Open or update pull request when something changed]
   end
 
   A --> D
   B --> D
   C -.-> D
-  D --> E
-  E -- no --> X[Stop, nothing to commit]
-  E -- yes --> F --> G --> H --> I
+  D --> R --> O --> G --> H --> I
   I -- you review and merge --> J[Vercel rebuilds and redeploys]
   J --> K[Chatbot answers from new sources]
 ```
+
+Research-repo snapshots are part of the same job. See [PLAN_REPO_AGENT.md](PLAN_REPO_AGENT.md) Step 4 and [data/repos/README.md](data/repos/README.md). A run with no Drive changes and no branch changes opens no pull request. A research-repo change still opens one.
 
 The chatbot itself (`app/api/digital-twin/route.js`) does not change. It stays a read-only endpoint with no Google credentials. All fetching happens in the background job.
 
@@ -78,6 +78,7 @@ Writes the pull request description:
 
 - **Changed files:** which Drive files were picked up, with their names and modified times.
 - **What changed:** for each source whose extracted text differs, the old and new text go to `gpt-4o-mini`, which returns a short bullet list of factual changes, e.g. "Added AI Engineering Intern role at Hawl Technologies." If `OPENAI_API_KEY` isn't set or the call fails, this section says so and the job continues.
+- **Repo changes:** for each research-repo branch whose commit changed, the old and new commit IDs and which snapshot files changed. Branches added or deleted are listed separately, along with whether `overview.md` was regenerated.
 - **Sanity checks:** code-based warnings that don't depend on the AI, such as extracted text shrinking by more than 40% or being under 500 characters, both signs of a bad PDF export.
 
 The "before" versions come from `git show HEAD:...`. The job never commits before the pull request step, so `HEAD` is still the version currently on `main`.
@@ -88,7 +89,8 @@ Replaces `monthly-linkedin-refresh.yml`.
 
 - Triggers: a weekly schedule, manual `workflow_dispatch`, and `repository_dispatch` with type `drive-changed` (reserved for Phase 2).
 - A `concurrency` group ensures overlapping triggers never run at the same time.
-- Uses `peter-evans/create-pull-request` on a fixed branch (`weekly-rag-refresh`). If an earlier pull request is still open, it gets updated rather than duplicated. If nothing changed, no pull request is opened.
+- After the Drive fetch, runs `npm run sync-repos` and `npm run build-repo-overview` (using the existing `OPENAI_API_KEY`), then `npm run sync-rag`. No new secrets are required while the research repos stay public.
+- Uses `peter-evans/create-pull-request` on a fixed branch (`weekly-rag-refresh`) with the title "Update chatbot sources". If an earlier pull request is still open, it gets updated rather than duplicated. If nothing changed, no pull request is opened. A failure in the repo steps fails the job before this step.
 
 ### Human review stays in the loop
 
@@ -101,10 +103,10 @@ The pull request is never auto-merged. These files decide what the chatbot tells
 3. **GitHub:** under repository **Settings → Secrets and variables → Actions**, add these secrets:
    - `GOOGLE_SERVICE_ACCOUNT_JSON`: the full contents of the JSON key file.
    - `GOOGLE_DRIVE_FOLDER_ID`: the ID from the folder URL (`drive.google.com/drive/folders/<this part>`).
-   - `OPENAI_API_KEY`: optional, enables the AI change summary.
+   - `OPENAI_API_KEY`: used for the change summary, and required when a research-repo branch changed so the overview can be rewritten.
 4. Run the workflow once by hand from the **Actions** tab to confirm it works.
 
-Local testing uses the same variables in `.env` (already gitignored), then `npm run fetch-drive && npm run sync-rag`.
+Local testing uses the same variables in `.env` (already gitignored), then `npm run fetch-drive`, `npm run sync-repos`, `npm run build-repo-overview`, and `npm run sync-rag`.
 
 ## Phase 2 (later): react to Drive changes within minutes
 

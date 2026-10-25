@@ -7,7 +7,7 @@ Personal portfolio and research archive for Sachin Ganpule, built with Next.js a
 - Single-page portfolio: hero, status, areas of inquiry, reading archive, featured projects, and contact links.
 - Scroll-reactive dark gradient background (`hooks/useScrollProgress.js` drives the colors in `app/page.js`).
 - Digital Twin chat backed by a server-side API route that calls OpenAI. The API key never reaches the browser.
-- Chatbot sources are generated from PDFs at build time, and a weekly GitHub Action pulls updated resume and LinkedIn PDFs from Google Drive and opens a pull request for review.
+- Chatbot sources are generated from PDFs and research-repo overviews at build time. A weekly GitHub Action pulls updated resume and LinkedIn PDFs from Google Drive, refreshes the research-repo snapshot, and opens a pull request for review.
 
 ## Tech stack
 
@@ -36,28 +36,28 @@ Open [http://localhost:3000](http://localhost:3000). The page works without an A
 
 ## Scripts
 
-| Command               | What it does                                                                                  |
-| --------------------- | --------------------------------------------------------------------------------------------- |
-| `npm run dev`         | Start the Next.js dev server.                                                                 |
-| `npm run build`       | Production build. Runs `sync-rag` first via `prebuild`.                                       |
-| `npm start`           | Serve the production build.                                                                   |
-| `npm run sync-rag`    | Extract text from `data/rag/` sources and regenerate `data/rag/sources.js`. Also adds each `data/repos/<slug>/overview.md`. |
-| `npm run sync-repos`  | Copy the research repos listed in `data/repos/config.mjs` into `data/repos/`.                  |
-| `npm run build-repo-overview` | Write `data/repos/<slug>/overview.md` with `gpt-4.1` when a snapshot branch commit changed. Needs `OPENAI_API_KEY`. |
-| `npm run fetch-drive` | Download changed resume/LinkedIn PDFs from Google Drive (needs Google credentials in `.env`). |
-| `npm test`            | Run the Vitest suite in `tests/`.                                                             |
-| `npm run lint`        | Run ESLint.                                                                                   |
+| Command                       | What it does                                                                                                                |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                 | Start the Next.js dev server.                                                                                               |
+| `npm run build`               | Production build. Runs `sync-rag` first via `prebuild`.                                                                     |
+| `npm start`                   | Serve the production build.                                                                                                 |
+| `npm run sync-rag`            | Extract text from `data/rag/` sources and regenerate `data/rag/sources.js`. Also adds each `data/repos/<slug>/overview.md`. |
+| `npm run sync-repos`          | Copy the research repos listed in `data/repos/config.mjs` into `data/repos/`.                                               |
+| `npm run build-repo-overview` | Write `data/repos/<slug>/overview.md` with `gpt-4.1` when a snapshot branch commit changed. Needs `OPENAI_API_KEY`.         |
+| `npm run fetch-drive`         | Download changed resume/LinkedIn PDFs from Google Drive (needs Google credentials in `.env`).                               |
+| `npm test`                    | Run the Vitest suite in `tests/`.                                                                                           |
+| `npm run lint`                | Run ESLint.                                                                                                                 |
 
 ## Environment variables
 
 See [`.env.example`](.env.example) for the full list.
 
-| Variable                      | Used by                                   | Required             |
-| ----------------------------- | ----------------------------------------- | -------------------- |
+| Variable                      | Used by                                                              | Required             |
+| ----------------------------- | -------------------------------------------------------------------- | -------------------- |
 | `OPENAI_API_KEY`              | Chat API route, change-summary script, `npm run build-repo-overview` | Yes, for the chatbot |
-| `CHAT_ANALYTICS_SALT`         | Hashing client IPs in chat analytics logs | No (has a default)   |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | `npm run fetch-drive`                     | Only for Drive sync  |
-| `GOOGLE_DRIVE_FOLDER_ID`      | `npm run fetch-drive`                     | Only for Drive sync  |
+| `CHAT_ANALYTICS_SALT`         | Hashing client IPs in chat analytics logs                            | No (has a default)   |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | `npm run fetch-drive`                                                | Only for Drive sync  |
+| `GOOGLE_DRIVE_FOLDER_ID`      | `npm run fetch-drive`                                                | Only for Drive sync  |
 
 ## Project structure
 
@@ -73,7 +73,7 @@ data/
   projects.js                 Featured projects
   readingArchive.js           Reading archive entries
   rag/                        Chatbot source files and generated sources.js (see data/rag/README.md)
-  repos/                      Research-repo list, manifest, and generated snapshots
+  repos/                      Research-repo list and generated snapshots (see data/repos/README.md)
 lib/
   digitalTwinRag.js           Chunking, embeddings, retrieval, and answer generation
   digitalTwinConfig.js        Message, history, and rate-limit settings
@@ -88,7 +88,7 @@ assets/profile.png            Hero portrait
 ## Updating content
 
 - **Page copy** (projects, reading archive, hero text, skills): see [docs/content.md](docs/content.md).
-- **Chatbot knowledge** (resume, LinkedIn, research interests): see [data/rag/README.md](data/rag/README.md).
+- **Chatbot knowledge** (resume, LinkedIn, research interests, research repos): see [data/rag/README.md](data/rag/README.md) and [data/repos/README.md](data/repos/README.md).
 
 ## Deployment
 
@@ -103,6 +103,7 @@ Pushing to `main` deploys to Vercel. The Vercel build runs `npm run build`, whic
 | [docs/content.md](docs/content.md)                   | Where each piece of site content lives and how to edit it        |
 | [docs/deployment.md](docs/deployment.md)             | Vercel, GitHub secrets, weekly refresh workflow, troubleshooting |
 | [data/rag/README.md](data/rag/README.md)             | Updating the chatbot's source material                           |
+| [data/repos/README.md](data/repos/README.md)         | Research-repo snapshots, branch excludes, and local refresh      |
 | [AGENTS.md](AGENTS.md)                               | Conventions and guardrails for AI coding agents                  |
 | [PLAN.md](PLAN.md)                                   | Design of the weekly Google Drive RAG refresh                    |
 | [PLAN_UPDATED_WEBSITE.md](PLAN_UPDATED_WEBSITE.md)   | Earlier plan for build-time RAG generation (historical)          |

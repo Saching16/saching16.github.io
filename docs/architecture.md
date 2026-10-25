@@ -53,12 +53,12 @@ The full contract is in [digital-twin-api.md](digital-twin-api.md).
 
 `scripts/sync-rag-sources.mjs` reads the files in `data/rag/`, extracts text from PDFs with `pdf-parse`, cleans whitespace and page markers, and writes `data/rag/sources.js` as an array of `{ label, content }` objects. It also adds each `data/repos/<slug>/overview.md` when that file exists.
 
-| Label              | Preferred input         | Fallback       | Required |
-| ------------------ | ----------------------- | -------------- | -------- |
-| Resume             | `resume.pdf`            | `resume.txt`   | Yes      |
-| LinkedIn           | `linkedin.pdf`          | `linkedin.txt` | No       |
-| Research Interests | `research-interests.md` | none           | Yes      |
-| Project: RecursiveMAS-Coding-Agents | `data/repos/recursivemas-coding-agents/overview.md` | none | No |
+| Label                               | Preferred input                                     | Fallback       | Required |
+| ----------------------------------- | --------------------------------------------------- | -------------- | -------- |
+| Resume                              | `resume.pdf`                                        | `resume.txt`   | Yes      |
+| LinkedIn                            | `linkedin.pdf`                                      | `linkedin.txt` | No       |
+| Research Interests                  | `research-interests.md`                             | none           | Yes      |
+| Project: RecursiveMAS-Coding-Agents | `data/repos/recursivemas-coding-agents/overview.md` | none           | No       |
 
 `npm run build-repo-overview` writes that overview with `gpt-4.1` from the committed repo snapshot. Long source files are clipped so the request fits the account token limit. The script skips the model call when every branch commit in the snapshot matches the commit list recorded in the existing overview.
 
@@ -84,12 +84,15 @@ The cache lasts as long as the warm instance. Each cold start re-embeds all sour
 
 ## Keeping sources current
 
-A weekly GitHub Action fetches updated PDFs from a Google Drive folder, regenerates `sources.js`, writes an AI summary of what changed, and opens a pull request. Merging the pull request triggers a Vercel redeploy. See [deployment.md](deployment.md) and [PLAN.md](../PLAN.md).
+A weekly GitHub Action fetches updated PDFs from a Google Drive folder, copies the public research repos into `data/repos/`, regenerates an overview when a branch commit changed, regenerates `sources.js`, and opens a pull request titled "Update chatbot sources". The pull request body includes a "Repo changes" section. Merging the pull request triggers a Vercel redeploy. See [deployment.md](deployment.md), [PLAN.md](../PLAN.md), and [data/repos/README.md](../data/repos/README.md).
 
 ```mermaid
 flowchart LR
   Drive[(Google Drive folder)] --> Fetch[fetch-drive-sources.mjs]
+  Repos[(Public research repos)] --> Snap[sync-repo-snapshots.mjs]
+  Snap --> Overview[build-repo-overview.mjs]
   Fetch --> Sync[sync-rag-sources.mjs]
+  Overview --> Sync
   Sync --> Summary[summarize-rag-changes.mjs]
   Summary --> PR[Pull request on weekly-rag-refresh]
   PR -- merge --> Vercel[Vercel redeploy]

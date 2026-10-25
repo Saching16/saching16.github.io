@@ -7,6 +7,7 @@ import { REPO_SOURCES } from "../data/repos/config.mjs";
 import {
   OVERVIEW_INSTRUCTIONS,
   buildOverviewMaterials,
+  dropInvalidOverviewSentences,
   overviewIsCurrent,
   stampOverview,
   stripModelFences,
@@ -49,10 +50,34 @@ async function draftOverview(client, snapshot) {
     }
 
     lastErrors = validateOverview(body, snapshot);
+    if (lastErrors.length > 0) {
+      try {
+        const salvaged = dropInvalidOverviewSentences(body, snapshot);
+        const salvagedErrors = validateOverview(salvaged.markdown, snapshot);
+        if (salvaged.removed.length > 0 && salvagedErrors.length === 0) {
+          console.warn(
+            `Dropped ${salvaged.removed.length} sentence(s) that failed overview checks.`,
+          );
+          for (const sentence of salvaged.removed) {
+            console.warn(`Dropped: ${sentence}`);
+          }
+          return stampOverview(salvaged.markdown, snapshot);
+        }
+      } catch (error) {
+        console.error(
+          `Could not drop invalid sentences: ${error.message}`,
+        );
+      }
+    }
     if (lastErrors.length === 0) {
       return stampOverview(body, snapshot);
     }
 
+    console.error(
+      `Overview draft ${attempt} failed checks:\n${lastErrors
+        .map((error) => `- ${error}`)
+        .join("\n")}`,
+    );
     feedback = `\n\nYour previous draft failed these checks:\n${lastErrors
       .map((error) => `- ${error}`)
       .join("\n")}\nRewrite the full overview with the six required headings.`;
